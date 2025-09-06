@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hash Comparator — vhash · SSDEEP · TLSH · ImpHash</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="description" content="Client‑side similarity/comparison tool for vhash, SSDEEP, TLSH, and ImpHash. Runs entirely in your browser.">
+    <style>
+    :root { color-scheme: light dark; }
+    .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
+    .chip { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs border; }
+    .kbd { @apply border rounded px-1 py-0.5 text-xs font-semibold; }
+    #drop-zone { border: 2px dashed #888; border-radius: 1rem; padding: 1rem; text-align: center; cursor: pointer; }
+    #drop-zone.dragover { background: rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 min-h-screen">
+    <div class="max-w-6xl mx-auto p-4 sm:p-6">
+    <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+        <div>
+        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Hash Comparator
+            <span class="text-sm align-top font-medium text-gray-500">v1.2</span>
+        </h1>
+        <p class="text-sm text-gray-600 dark:text-gray-400">Compare <span class="font-semibold">vhash</span>, <span class="font-semibold">SSDEEP</span>, <span class="font-semibold">TLSH</span>, and <span class="font-semibold">ImpHash</span> in your browser. No uploads.</p>
+        </div>
+        <div class="flex items-center gap-2">
+        <button id="btn-share" class="rounded-2xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Share</button>
+        <a href="https://github.com/new" target="_blank" class="rounded-2xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Add to GitHub</a>
+        </div>
+    </header>
+
+    <section class="grid md:grid-cols-2 gap-4 md:gap-6">
+        <div class="space-y-3">
+        <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold">Input hashes</h2>
+            <span class="text-xs text-gray-500">Paste one per line or drop a file.</span>
+        </div>
+        <textarea id="hashes" class="w-full h-48 md:h-64 mono rounded-2xl border bg-white/70 dark:bg-white/5 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Example:\nSSDEEP: 192:La9X...:...\nTLSH: T1D2E7...\nvhash: 0840:3V8:...\nImpHash: 1f3870be274f6c49b3e31a0c6728957f"></textarea>
+        <div id="drop-zone" class="text-xs text-gray-600 dark:text-gray-400">Drag & drop a text file with hashes here</div>
+        <div class="flex flex-wrap gap-2">
+            <button id="btn-sample" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Load samples</button>
+            <button id="btn-clear" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Clear</button>
+            <button id="btn-compare" class="rounded-xl border px-3 py-1.5 text-sm bg-indigo-600 border-indigo-600 text-white hover:brightness-110">Compare</button>
+        </div>
+        <div class="text-xs text-gray-600 dark:text-gray-400">
+            Tip: Press <span class="kbd">Shift</span>+<span class="kbd">Enter</span> to compare.
+        </div>
+        </div>
+
+        <div class="space-y-3">
+        <h2 class="text-lg font-semibold">Options</h2>
+        <div class="grid grid-cols-1 gap-3">
+            <label class="flex items-center justify-between border rounded-2xl p-3">
+            <div>
+                <div class="font-medium">Auto-detect hash type</div>
+                <div class="text-xs text-gray-500">Based on format (prefix/pattern). You can override per-line with type tags.</div>
+            </div>
+            <input id="opt-autodetect" type="checkbox" checked class="h-4 w-4">
+            </label>
+            <label class="flex items-center justify-between border rounded-2xl p-3">
+            <div>
+                <div class="font-medium">Strict SSDEEP</div>
+                <div class="text-xs text-gray-500">Use near-spec similarity (slower). If off, uses fast heuristic.</div>
+            </div>
+            <input id="opt-ssdeep-strict" type="checkbox" checked class="h-4 w-4">
+            </label>
+            <label class="flex items-center justify-between border rounded-2xl p-3">
+            <div>
+                <div class="font-medium">Heuristic vhash similarity</div>
+                <div class="text-xs text-gray-500">Token/Jaccard similarity. <span class="font-medium">Not</span> equivalent to VirusTotal’s score.</div>
+            </div>
+            <input id="opt-vhash-heur" type="checkbox" checked class="h-4 w-4">
+            </label>
+        </div>
+        </div>
+    </section>
+
+    <section class="mt-6">
+        <div class="flex items-center gap-3">
+        <h2 class="text-lg font-semibold">Results</h2>
+        <span id="meta" class="text-xs text-gray-500"></span>
+        </div>
+        <div id="results" class="mt-3 overflow-x-auto"></div>
+    </section>
+
+        <footer class="mt-10 text-xs text-gray-500 leading-relaxed">
+        <p><strong>Notes</strong>: vhash similarity here is a best‑effort tokenizer/Jaccard heuristic for educational use and <em>does not</em> replicate VirusTotal’s proprietary comparator. SSDEEP and TLSH comparisons are computed from hash strings only (no files needed). ImpHash is an exact match (MD5 of imports) with optional string distances for convenience.</p>
+        <p class="mt-1">All processing is client‑side. You can host this file directly on GitHub Pages. Made with ♥ for DFIR & malware triage.</p>
+        </footer>
+    </div>
+
+<script>
+const $ = sel => document.querySelector(sel);
+const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const lcsLen = (a, b) => { const n=a.length, m=b.length; if(!n||!m) return 0; const dp=new Array(m+1).fill(0); let best=0;
+    for(let i=1;i<=n;i++){ let prev=0; for(let j=1;j<=m;j++){ const tmp=dp[j]; dp[j] = (a[i-1]===b[j-1]) ? prev+1 : 0; prev=tmp; if(dp[j]>best) best=dp[j]; }} return best; };
+const hamming = (a,b) => (a.length===b.length) ? [...a].reduce((s,ch,i)=>s+(ch!==b[i]),0) : NaN;
+const lev = (a,b) => { const n=a.length,m=b.length; const dp=Array.from({length:n+1},()=>new Array(m+1).fill(0)); for(let i=0;i<=n;i++) dp[i][0]=i; for(let j=0;j<=m;j++) dp[0][j]=j; for(let i=1;i<=n;i++) for(let j=1;j<=m;j++) dp[i][j]=Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return dp[n][m]; };
+
+function detectType(s){
+    const t = s.trim();
+    const m = t.match(/^(ssdeep|tlsh|vhash|imphash)\s*[:=]\s*(.+)$/i);
+    if(m) return {type:m[1].toLowerCase(), value:m[2].trim()};
+    if(/^[0-9a-f]{32}$/i.test(t)) return {type:'imphash', value:t};
+    if(/^T[0-9]/i.test(t) && /[0-9a-f]{70,}/i.test(t.replace(/[^0-9a-f]/gi,''))) return {type:'tlsh', value:t};
+    if(/^[0-9]+:[A-Za-z0-9\/+\.]+:[A-Za-z0-9\/+\.]+$/.test(t)) return {type:'ssdeep', value:t};
+    if(/^[0-9]+:[A-Za-z0-9:._-]+$/.test(t)) return {type:'vhash', value:t};
+    return {type:'unknown', value:t};
+}
+
+function parseSsdeep(h){ const m = h.trim().match(/^(\d+):([^:]+):([^:]+)$/); if(!m) return null; return { b: parseInt(m[1],10), h1:m[2], h2:m[3] }; }
+function _scoreChunks(a,b){ const l = lcsLen(a,b); if(l===0) return 0; const maxLen=Math.max(a.length,b.length); return Math.round(100*(2*l)/(maxLen+l)); }
+function compareSsdeep(sa,sb,strict=true){ const A=parseSsdeep(sa),B=parseSsdeep(sb); if(!A||!B) return {ok:false,score:0,reason:'Invalid SSDEEP format'}; const pairs=[]; if(A.b===B.b) pairs.push([A.h1,B.h1],[A.h2,B.h2]); if(A.b*2===B.b) pairs.push([A.h2,B.h1]); if(B.b*2===A.b) pairs.push([A.h1,B.h2]); if(pairs.length===0) return {ok:true,score:0,detail:'Block sizes not comparable'}; let best=0,details=[]; for(const [x,y] of pairs){ let s=_scoreChunks(x,y); if(strict){ const norm=z=>z.replace(/(.)\1{3,}/g,'$1$1$1'); s=_scoreChunks(norm(x),norm(y)); } best=Math.max(best,s); details.push({x,y,s}); } return {ok:true,score:best,pairs:details}; }
+
+// TLSH reference-compatible distance
+function parseTlshStrict(s){
+    const raw = s.trim();
+    if(!/^T[0-9]/.test(raw)) return null;
+    const hex = raw.replace(/^T[0-9]/,'');
+    const H = hex.replace(/[^0-9a-f]/gi,'').toLowerCase();
+    if(H.length < 70) return null;
+    const BODY_LEN = 64, Q_LEN = 6, L_LEN = 2;
+    const chkLen = H.length - (BODY_LEN + Q_LEN + L_LEN);
+    if(chkLen!==2 && chkLen!==6) return null;
+    const chk = H.slice(0, chkLen);
+    const q = [parseInt(H.slice(chkLen,chkLen+2),16), parseInt(H.slice(chkLen+2,chkLen+4),16), parseInt(H.slice(chkLen+4,chkLen+6),16)];
+    const lval = parseInt(H.slice(chkLen+6,chkLen+8),16);
+    const body = H.slice(chkLen+8);
+    if(body.length!==BODY_LEN) return null;
+    return {chk,q,l:lval,body};
+}
+function hexHamming(a,b){ const n=Math.min(a.length,b.length); let d=0; for(let i=0;i<n;i++){ if(a[i]!==b[i]) d++; } d+=Math.abs(a.length-b.length); return d; }
+function byteHamming(a,b){ let v=a^b,c=0; while(v){ v&=v-1;c++; } return c; }
+function compareTlsh(a,b){ const A=parseTlshStrict(a),B=parseTlshStrict(b); if(!A||!B) return {ok:false,score:0,reason:'Invalid TLSH format'}; const bodyDist=hexHamming(A.body,B.body); const qDist=byteHamming(A.q[0],B.q[0])+byteHamming(A.q[1],B.q[1])+byteHamming(A.q[2],B.q[2]); const lDist=Math.abs(A.l-B.l); const chkDist=(A.chk===B.chk)?0:1; const dist=bodyDist+(qDist*12)+(lDist>0?lDist:0)+(chkDist*1); const sim=100/(1+Math.exp((dist-20)/4)); return {ok:true,score:Math.round(sim),dist,parts:{bodyDist,qDist,lDist,chkDist}}; }
+
+function compareImphash(a,b){ const A=a.trim().toLowerCase(),B=b.trim().toLowerCase(); const valid=s=>/^[0-9a-f]{32}$/.test(s); if(!valid(A)||!valid(B)) return {ok:false,score:0,reason:'Invalid MD5 (ImpHash)'}; const eq=A===B; const ham=hamming(A,B); const levd=lev(A,B); return {ok:true,score:eq?100:Math.max(0,100-Math.min(levd*3,100)),eq,ham,lev:levd}; }
+
+function vhashTokens(v){ const t=v.trim(); const parts=t.split(':').flatMap(x=>x.split(/[._-]/)); return new Set(parts.filter(x=>x&&!/^\d+$/.test(x))); }
+function compareVhash(a,b){ const A=vhashTokens(a),B=vhashTokens(b); const inter=[...A].filter(x=>B.has(x)).length; const uni=new Set([...A,...B]).size; const j=uni?inter/uni:0; const l=lcsLen(a,b); const maxLen=Math.max(a.length,b.length); const lbonus=maxLen?(l/maxLen)*0.25:0; const sim=clamp((j*0.85+lbonus)*100,0,100); return {ok:true,score:Math.round(sim),jaccard:+(j.toFixed(3)),lcs:l}; }
+
+function parseLines(){ const raw=$('#hashes').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean); const autodetect=$('#opt-autodetect').checked; return raw.map(line=>autodetect?detectType(line):{type:'unknown',value:line}); }
+function prettyType(t){ return t==='ssdeep'?'SSDEEP': t==='tlsh'?'TLSH': t==='vhash'?'vhash': t==='imphash'?'ImpHash': 'Unknown'; }
+function compare(a,b){ if(a.type!==b.type) return {score:null,note:'Type mismatch'}; switch(a.type){ case 'ssdeep': return compareSsdeep(a.value,b.value,$('#opt-ssdeep-strict').checked); case 'tlsh': return compareTlsh(a.value,b.value); case 'imphash': return compareImphash(a.value,b.value); case 'vhash': return compareVhash(a.value,b.value); default: return {score:null,note:'Unknown type'}; } }
+
+function render(){ const items = parseLines(); const n = items.length; if(n===0){ $('#results').innerHTML=''; $('#meta').textContent=''; return; }
+    const table = el('table','min-w-full border-separate border-spacing-0');
+    const thead = el('thead',''); const trh = el('tr',''); trh.appendChild(el('th','sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 p-2 text-left text-xs font-semibold text-gray-500'));
+    items.forEach((it,i)=>{ const th=el('th','px-2 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap'); th.textContent = `${i+1}. ${prettyType(it.type)}`; trh.appendChild(th); });
+    thead.appendChild(trh); table.appendChild(thead);
+    const tbody = el('tbody','');
+    items.forEach((row,i)=>{
+    const tr = el('tr','');
+    const head = el('th','sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 pr-3 pl-2 py-2 text-left align-top');
+    head.innerHTML = `<div class="text-xs font-semibold">${i+1}. ${prettyType(row.type)}</div><div class="mono text-xs text-gray-500 break-all">${row.value}</div>`;
+    tr.appendChild(head);
+    items.forEach((col,j)=>{
+        const td = el('td','px-2 py-2 align-top');
+        if(i===j){ td.innerHTML = `<div class="text-center text-xs text-gray-400">—</div>`; tr.appendChild(td); return; }
+        const res = compareAny(row,col);
+        let inner = '';
+        if(res.score==null){ inner = `<div class='text-xs text-gray-500'>${res.note||'N/A'}</div>`; }
+        else{
+        const score = res.score;
+        const hue = 0 + (score*1.2); // 0→120 deg approx
+        inner += `<div class='text-sm font-semibold' style='color:hsl(${hue},70%,45%)'>${score}</div>`;
+        inner += `<div class='text-[10px] text-gray-500'>/100</div>`;
+        if(res.pairs){ inner += `<div class='text-[10px] text-gray-500 mt-1'>pairs: ${res.pairs.map(p=>p.s).join(', ')}</div>`; }
+        if(res.jaccard!=null){ inner += `<div class='text-[10px] text-gray-500'>jaccard ${res.jaccard}</div>`; }
+        if(res.dist!=null){ inner += `<div class='text-[10px] text-gray-500'>dist ${res.dist}</div>`; if(res.parts){ inner += `<div class='text-[10px] text-gray-500'>body ${res.parts.bodyDist}, q ${res.parts.qDist}, l ${res.parts.lDist}, chk ${res.parts.chkDist}</div>`; } }
+        if(res.eq===true){ inner += `<div class='text-[10px] text-emerald-600'>exact match</div>`; }
+        if(res.detail){ inner += `<div class='text-[10px] text-gray-500'>${res.detail}</div>`; }
+        }
+        td.innerHTML = `<div class='flex items-baseline gap-1'>${inner}</div>`;
+        td.style.background = res.score==null ? '' : `linear-gradient(90deg, hsla(${Math.max(0,120-res.score*1.2)},80%,90%,0.6), transparent)`;
+        tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    $('#results').innerHTML=''; $('#results').appendChild(table);
+    $('#meta').textContent = `${n} hash${n>1?'es':''} • ${new Date().toLocaleString()}`;
+}
+
+// -------------------------
+// Samples & UX
+// -------------------------
+const samples = `# You can keep these or replace with your own
+ssdeep: 3072:dfr2cI9R2oQf9qQwq3b1d6B0YdN:dfIoQf9qQwqb1d6B0
+ssdeep: 3072:Zfr2cI9R2oQf9qQwq3b1d6B0YdM:ZfIoQf9qQwqb1d6B0
+vhash: 0840:3V8:abc.def:ghi
+vhash: 0840:3V9:abc.xyz:ghi
+imphash: 1f3870be274f6c49b3e31a0c6728957f
+imphash: 1f3870be274f6c49b3e31a0c6728957e
+TLSH: T1AA3F5C1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890
+TLSH: T1AA3F5C1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567891`;
+
+$('#btn-sample').addEventListener('click',()=>{ $('#hashes').value = samples; render(); });
+$('#btn-clear').addEventListener('click',()=>{ $('#hashes').value=''; render(); });
+$('#btn-compare').addEventListener('click',render);
+$('#hashes').addEventListener('keydown',e=>{ if(e.key==='Enter' && e.shiftKey){ e.preventDefault(); render(); } });
+
+// Share state in URL
+function updateURL(){
+    try{
+    const data = btoa(unescape(encodeURIComponent($('#hashes').value)));
+    history.replaceState(null,'',`#data=${data}`);
+    }catch{}
+}
+function loadFromURL(){
+    const m=location.hash.match(/#data=([^&]+)/); if(!m) return;
+    try{ $('#hashes').value = decodeURIComponent(escape(atob(m[1]))); }catch{}
+}
+$('#btn-share').addEventListener('click',()=>{ updateURL(); navigator.clipboard.writeText(location.href).then(()=>{
+    $('#btn-share').textContent='Copied link!'; setTimeout(()=>$('#btn-share').textContent='Share',1500);
+}); });
+
+window.addEventListener('load',()=>{ loadFromURL(); if(!$('#hashes').value) $('#hashes').value=samples; render(); });
+
+// -------------------------
+// Drag & Drop support (textarea + drop zone)
+// -------------------------
+const txt = $('#hashes');
+const dz  = $('#drop-zone');
+function setDZ(active){ dz.classList.toggle('dragover', active); txt.classList.toggle('ring-2', active); txt.classList.toggle('ring-indigo-500', active); }
+function handleFiles(fileList){
+    const readers=[];
+    for(const f of fileList){
+    if(f.type.startsWith('text') || /(\.txt|\.log|\.csv|\.lst|\.hash(?:es)?)$/i.test(f.name)){
+        const r = new FileReader();
+        readers.push(new Promise(res=>{ r.onload=()=>res(r.result); }));
+        r.readAsText(f);
+    }
+    }
+    Promise.all(readers).then(arr=>{ if(arr.length){ txt.value += (txt.value? '\n':'') + arr.join('\n'); render(); } });
+}
+['dragenter','dragover'].forEach(ev=> dz.addEventListener(ev, e=>{ e.preventDefault(); setDZ(true); }));
+['dragleave','dragend','drop'].forEach(ev=> dz.addEventListener(ev, e=>{ if(ev!=='drop') setDZ(false); }));
+dz.addEventListener('drop', e=>{ e.preventDefault(); setDZ(false); const dt=e.dataTransfer; if(dt?.files?.length) handleFiles(dt.files); const plain=dt.getData('text/plain'); if(plain){ txt.value += (txt.value?'\n':'') + plain.trim(); render(); } });
+// Also allow dropping directly on the textarea
+['dragenter','dragover'].forEach(ev=> txt.addEventListener(ev, e=>{ e.preventDefault(); setDZ(true); }));
+['dragleave','dragend','drop'].forEach(ev=> txt.addEventListener(ev, e=>{ if(ev!=='drop') setDZ(false); }));
+txt.addEventListener('drop', e=>{ e.preventDefault(); setDZ(false); const dt=e.dataTransfer; if(dt?.files?.length) handleFiles(dt.files); const plain=dt.getData('text/plain'); if(plain){ txt.value += (txt.value?'\n':'') + plain.trim(); render(); } });
+</script>
+</body>
+</html>
