@@ -91,6 +91,9 @@
     </div>
 
 <script>
+// -------------------------
+// Utilities
+// -------------------------
 const $ = sel => document.querySelector(sel);
 const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -99,22 +102,47 @@ const lcsLen = (a, b) => { const n=a.length, m=b.length; if(!n||!m) return 0; co
 const hamming = (a,b) => (a.length===b.length) ? [...a].reduce((s,ch,i)=>s+(ch!==b[i]),0) : NaN;
 const lev = (a,b) => { const n=a.length,m=b.length; const dp=Array.from({length:n+1},()=>new Array(m+1).fill(0)); for(let i=0;i<=n;i++) dp[i][0]=i; for(let j=0;j<=m;j++) dp[0][j]=j; for(let i=1;i<=n;i++) for(let j=1;j<=m;j++) dp[i][j]=Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return dp[n][m]; };
 
+// -------------------------
+// Type detection & parsing
+// -------------------------
 function detectType(s){
     const t = s.trim();
     const m = t.match(/^(ssdeep|tlsh|vhash|imphash)\s*[:=]\s*(.+)$/i);
     if(m) return {type:m[1].toLowerCase(), value:m[2].trim()};
     if(/^[0-9a-f]{32}$/i.test(t)) return {type:'imphash', value:t};
+  // Canonical TLSH (T1...) with at least ~70 hex after stripping non-hex
     if(/^T[0-9]/i.test(t) && /[0-9a-f]{70,}/i.test(t.replace(/[^0-9a-f]/gi,''))) return {type:'tlsh', value:t};
     if(/^[0-9]+:[A-Za-z0-9\/+\.]+:[A-Za-z0-9\/+\.]+$/.test(t)) return {type:'ssdeep', value:t};
     if(/^[0-9]+:[A-Za-z0-9:._-]+$/.test(t)) return {type:'vhash', value:t};
     return {type:'unknown', value:t};
 }
 
+// -------------------------
+// SSDEEP comparison (hash->hash)
+// -------------------------
 function parseSsdeep(h){ const m = h.trim().match(/^(\d+):([^:]+):([^:]+)$/); if(!m) return null; return { b: parseInt(m[1],10), h1:m[2], h2:m[3] }; }
 function _scoreChunks(a,b){ const l = lcsLen(a,b); if(l===0) return 0; const maxLen=Math.max(a.length,b.length); return Math.round(100*(2*l)/(maxLen+l)); }
-function compareSsdeep(sa,sb,strict=true){ const A=parseSsdeep(sa),B=parseSsdeep(sb); if(!A||!B) return {ok:false,score:0,reason:'Invalid SSDEEP format'}; const pairs=[]; if(A.b===B.b) pairs.push([A.h1,B.h1],[A.h2,B.h2]); if(A.b*2===B.b) pairs.push([A.h2,B.h1]); if(B.b*2===A.b) pairs.push([A.h1,B.h2]); if(pairs.length===0) return {ok:true,score:0,detail:'Block sizes not comparable'}; let best=0,details=[]; for(const [x,y] of pairs){ let s=_scoreChunks(x,y); if(strict){ const norm=z=>z.replace(/(.)\1{3,}/g,'$1$1$1'); s=_scoreChunks(norm(x),norm(y)); } best=Math.max(best,s); details.push({x,y,s}); } return {ok:true,score:best,pairs:details}; }
+function compareSsdeep(sa,sb,strict=true){
+    const A=parseSsdeep(sa),B=parseSsdeep(sb);
+    if(!A||!B) return {ok:false,score:0,reason:'Invalid SSDEEP format'};
+    const pairs=[];
+    if(A.b===B.b) pairs.push([A.h1,B.h1],[A.h2,B.h2]);
+    if(A.b*2===B.b) pairs.push([A.h2,B.h1]);
+    if(B.b*2===A.b) pairs.push([A.h1,B.h2]);
+    if(pairs.length===0) return {ok:true,score:0,detail:'Block sizes not comparable'};
+    let best=0,details=[];
+    for(const [x,y] of pairs){
+    let s=_scoreChunks(x,y);
+    if(strict){ const norm=z=>z.replace(/(.)\1{3,}/g,'$1$1$1'); s=_scoreChunks(norm(x),norm(y)); }
+    best=Math.max(best,s);
+    details.push({x,y,s});
+    }
+    return {ok:true,score:best,pairs:details};
+}
 
-// TLSH reference-compatible distance
+// -------------------------
+// TLSH distance (reference-compatible, hash-only)
+// -------------------------
 function parseTlshStrict(s){
     const raw = s.trim();
     if(!/^T[0-9]/.test(raw)) return null;
@@ -133,18 +161,71 @@ function parseTlshStrict(s){
 }
 function hexHamming(a,b){ const n=Math.min(a.length,b.length); let d=0; for(let i=0;i<n;i++){ if(a[i]!==b[i]) d++; } d+=Math.abs(a.length-b.length); return d; }
 function byteHamming(a,b){ let v=a^b,c=0; while(v){ v&=v-1;c++; } return c; }
-function compareTlsh(a,b){ const A=parseTlshStrict(a),B=parseTlshStrict(b); if(!A||!B) return {ok:false,score:0,reason:'Invalid TLSH format'}; const bodyDist=hexHamming(A.body,B.body); const qDist=byteHamming(A.q[0],B.q[0])+byteHamming(A.q[1],B.q[1])+byteHamming(A.q[2],B.q[2]); const lDist=Math.abs(A.l-B.l); const chkDist=(A.chk===B.chk)?0:1; const dist=bodyDist+(qDist*12)+(lDist>0?lDist:0)+(chkDist*1); const sim=100/(1+Math.exp((dist-20)/4)); return {ok:true,score:Math.round(sim),dist,parts:{bodyDist,qDist,lDist,chkDist}}; }
+function compareTlsh(a,b){
+    const A=parseTlshStrict(a),B=parseTlshStrict(b);
+    if(!A || !B) return { ok:false, score:0, reason:'Invalid TLSH format (expect canonical T1… digest)' };
+    const bodyDist=hexHamming(A.body,B.body);
+    const qDist=byteHamming(A.q[0],B.q[0])+byteHamming(A.q[1],B.q[1])+byteHamming(A.q[2],B.q[2]);
+    const lDist=Math.abs(A.l-B.l);
+    const chkDist=(A.chk===B.chk)?0:1;
+    const dist=bodyDist+(qDist*12)+(lDist>0?lDist:0)+(chkDist*1);
+    const sim=100/(1+Math.exp((dist-20)/4));
+    return {ok:true,score:Math.round(sim),dist,parts:{bodyDist,qDist,lDist,chkDist}};
+}
 
-function compareImphash(a,b){ const A=a.trim().toLowerCase(),B=b.trim().toLowerCase(); const valid=s=>/^[0-9a-f]{32}$/.test(s); if(!valid(A)||!valid(B)) return {ok:false,score:0,reason:'Invalid MD5 (ImpHash)'}; const eq=A===B; const ham=hamming(A,B); const levd=lev(A,B); return {ok:true,score:eq?100:Math.max(0,100-Math.min(levd*3,100)),eq,ham,lev:levd}; }
+// -------------------------
+// ImpHash
+// -------------------------
+function compareImphash(a,b){
+    const A=a.trim().toLowerCase(),B=b.trim().toLowerCase();
+    const valid=s=>/^[0-9a-f]{32}$/.test(s);
+    if(!valid(A)||!valid(B)) return {ok:false,score:0,reason:'Invalid MD5 (ImpHash)'};
+    const eq=A===B; const ham=hamming(A,B); const levd=lev(A,B);
+    return {ok:true,score:eq?100:Math.max(0,100-Math.min(levd*3,100)),eq,ham,lev:levd};
+}
 
-function vhashTokens(v){ const t=v.trim(); const parts=t.split(':').flatMap(x=>x.split(/[._-]/)); return new Set(parts.filter(x=>x&&!/^\d+$/.test(x))); }
-function compareVhash(a,b){ const A=vhashTokens(a),B=vhashTokens(b); const inter=[...A].filter(x=>B.has(x)).length; const uni=new Set([...A,...B]).size; const j=uni?inter/uni:0; const l=lcsLen(a,b); const maxLen=Math.max(a.length,b.length); const lbonus=maxLen?(l/maxLen)*0.25:0; const sim=clamp((j*0.85+lbonus)*100,0,100); return {ok:true,score:Math.round(sim),jaccard:+(j.toFixed(3)),lcs:l}; }
+// -------------------------
+// vhash heuristic similarity
+// -------------------------
+function vhashTokens(v){ const t=v.trim(); const parts=t.split(':').flatMap(x=>x.split(/[._-]/)); return new Set(parts.filter(x=>x && !/^\d+$/.test(x))); }
+function compareVhash(a,b){
+    const A=vhashTokens(a),B=vhashTokens(b);
+    const inter=[...A].filter(x=>B.has(x)).length; const uni=new Set([...A,...B]).size;
+    const j=uni? inter/uni : 0;
+    const l=lcsLen(a,b); const maxLen=Math.max(a.length,b.length);
+    const lbonus = maxLen? (l/maxLen)*0.25 : 0;
+    const sim = clamp((j*0.85 + lbonus)*100, 0, 100);
+    return { ok:true, score:Math.round(sim), jaccard:+(j.toFixed(3)), lcs:l };
+}
 
-function parseLines(){ const raw=$('#hashes').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean); const autodetect=$('#opt-autodetect').checked; return raw.map(line=>autodetect?detectType(line):{type:'unknown',value:line}); }
+// -------------------------
+// Matrix & UI
+// -------------------------
+function parseLines(){
+    const raw = $('#hashes').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    const autodetect = $('#opt-autodetect').checked;
+    return raw.map(line=> autodetect ? detectType(line) : {type:'unknown', value:line});
+}
 function prettyType(t){ return t==='ssdeep'?'SSDEEP': t==='tlsh'?'TLSH': t==='vhash'?'vhash': t==='imphash'?'ImpHash': 'Unknown'; }
-function compare(a,b){ if(a.type!==b.type) return {score:null,note:'Type mismatch'}; switch(a.type){ case 'ssdeep': return compareSsdeep(a.value,b.value,$('#opt-ssdeep-strict').checked); case 'tlsh': return compareTlsh(a.value,b.value); case 'imphash': return compareImphash(a.value,b.value); case 'vhash': return compareVhash(a.value,b.value); default: return {score:null,note:'Unknown type'}; } }
 
-function render(){ const items = parseLines(); const n = items.length; if(n===0){ $('#results').innerHTML=''; $('#meta').textContent=''; return; }
+// Main comparator function
+function compare(a,b){
+    if(a.type!==b.type) return {score:null, note:'Type mismatch'};
+    switch(a.type){
+    case 'ssdeep':  return compareSsdeep(a.value,b.value, $('#opt-ssdeep-strict').checked);
+    case 'tlsh':    return compareTlsh(a.value,b.value);
+    case 'imphash': return compareImphash(a.value,b.value);
+    case 'vhash':   return compareVhash(a.value,b.value);
+    default:        return {score:null, note:'Unknown type'};
+    }
+}
+// Back-compat alias to fix your error
+const compareAny = compare;
+
+function render(){
+    const items = parseLines();
+    const n = items.length;
+    if(n===0){ $('#results').innerHTML=''; $('#meta').textContent=''; return; }
     const table = el('table','min-w-full border-separate border-spacing-0');
     const thead = el('thead',''); const trh = el('tr',''); trh.appendChild(el('th','sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 p-2 text-left text-xs font-semibold text-gray-500'));
     items.forEach((it,i)=>{ const th=el('th','px-2 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap'); th.textContent = `${i+1}. ${prettyType(it.type)}`; trh.appendChild(th); });
@@ -243,5 +324,6 @@ dz.addEventListener('drop', e=>{ e.preventDefault(); setDZ(false); const dt=e.da
 ['dragleave','dragend','drop'].forEach(ev=> txt.addEventListener(ev, e=>{ if(ev!=='drop') setDZ(false); }));
 txt.addEventListener('drop', e=>{ e.preventDefault(); setDZ(false); const dt=e.dataTransfer; if(dt?.files?.length) handleFiles(dt.files); const plain=dt.getData('text/plain'); if(plain){ txt.value += (txt.value?'\n':'') + plain.trim(); render(); } });
 </script>
+
 </body>
 </html>
