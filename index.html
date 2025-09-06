@@ -140,49 +140,89 @@ function compareSsdeep(sa,sb,strict=true){
     return {ok:true,score:best,pairs:details};
 }
 
-// -------------------------
-// TLSH distance (reference-compatible, hash-only)
-// -------------------------
-function parseTlshStrict(s){
+function parseTlsh(s) {
+    if (typeof s !== 'string') return null;
     const raw = s.trim();
-    if(!/^T[0-9]/.test(raw)) return null;
-    const hex = raw.replace(/^T[0-9]/,'');
-    const H = hex.replace(/[^0-9a-f]/gi,'').toLowerCase();
-    if(H.length < 70) return null;
-    const BODY_LEN = 64, Q_LEN = 6, L_LEN = 2;
-    const chkLen = H.length - (BODY_LEN + Q_LEN + L_LEN);
-    if(chkLen!==2 && chkLen!==6) return null;
+  const m = raw.match(/^T[01]/) ? raw.replace(/^T[01]/, '') : raw; // soporta T1 y legado
+    const H = m.replace(/[^0-9a-f]/gi, '').toLowerCase();
+  if (H.length !== 70 && H.length !== 74) return null; // 1B checksum (70) o 3B (74)
+  const bodyLen = 64; // 64 hex digits (no bytes)
+    const chkLen = H.length - (2 /*l*/ + 2 /*q*/ + bodyLen);
+    if (chkLen !== 2 && chkLen !== 6) return null;
+
     const chk = H.slice(0, chkLen);
-    const q = [parseInt(H.slice(chkLen,chkLen+2),16), parseInt(H.slice(chkLen+2,chkLen+4),16), parseInt(H.slice(chkLen+4,chkLen+6),16)];
-    const lval = parseInt(H.slice(chkLen+6,chkLen+8),16);
-    const body = H.slice(chkLen+8);
-    if(body.length!==BODY_LEN) return null;
-    return {chk,q,l:lval,body};
+    const l = parseInt(H.slice(chkLen, chkLen + 2), 16);
+    const qByte = parseInt(H.slice(chkLen + 2, chkLen + 4), 16);
+    const q1 = (qByte >> 4) & 0xF;
+    const q2 = qByte & 0xF;
+  const body = H.slice(chkLen + 4); // 64 hex digits
+    if (body.length !== bodyLen) return null;
+    return { chk, l, q1, q2, body };
 }
-function hexHamming(a,b){ const n=Math.min(a.length,b.length); let d=0; for(let i=0;i<n;i++){ if(a[i]!==b[i]) d++; } d+=Math.abs(a.length-b.length); return d; }
-function byteHamming(a,b){ let v=a^b,c=0; while(v){ v&=v-1;c++; } return c; }
-function compareTlsh(a,b){
-    const A=parseTlshStrict(a),B=parseTlshStrict(b);
-    if(!A || !B) return { ok:false, score:0, reason:'Invalid TLSH format (expect canonical T1… digest)' };
-    const bodyDist=hexHamming(A.body,B.body);
-    const qDist=byteHamming(A.q[0],B.q[0])+byteHamming(A.q[1],B.q[1])+byteHamming(A.q[2],B.q[2]);
-    const lDist=Math.abs(A.l-B.l);
-    const chkDist=(A.chk===B.chk)?0:1;
-    const dist=bodyDist+(qDist*12)+(lDist>0?lDist:0)+(chkDist*1);
-    const sim=100/(1+Math.exp((dist-20)/4));
-    return {ok:true,score:Math.round(sim),dist,parts:{bodyDist,qDist,lDist,chkDist}};
+
+function modDiff(x, y, r) {
+    const a = (x - y + r) % r, b = (y - x + r) % r;
+    return a < b ? a : b;
 }
+
+function distanceHeaders(A, B, ignoreLen=false) {
+    let diff = 0;
+    if (!ignoreLen) {
+    const ldiff = modDiff(A.l, B.l, 256);
+    diff += (ldiff <= 1) ? ldiff : ldiff * 12;
+    }
+    const q1diff = modDiff(A.q1, B.q1, 16);
+  diff += (q1diff <= 1) ? q1diff : (q1diff - 1) * 12;
+
+    const q2diff = modDiff(A.q2, B.q2, 16);
+  diff += (q2diff <= 1) ? q2diff : (q2diff - 1) * 12;
+
+    if (A.chk !== B.chk) diff += 1;
+    return diff;
+}
+
+function distanceBodies(A, B) {
+    let diff = 0;
+    for (let i = 0; i < 64; i++) {
+    const x = parseInt(A.body[i], 16); // hex digit -> 0..15
+    const y = parseInt(B.body[i], 16);
+    const x1 = (x / 4) | 0, x2 = x % 4;
+    const y1 = (y / 4) | 0, y2 = y % 4;
+    const d1 = Math.abs(x1 - y1);
+    const d2 = Math.abs(x2 - y2);
+    diff += (d1 === 3 ? 6 : d1) + (d2 === 3 ? 6 : d2);
+    }
+    return diff;
+}
+
+// API principal (compatible con tlsh.diff / opción diffxlen)
+function compareTlsh(a, b, { ignoreLength=false } = {}) {
+    const A = parseTlsh(a), B = parseTlsh(b);
+    if (!A || !B) return { ok: false, score: 0, reason: 'Invalid TLSH format' };
+    const dist = distanceHeaders(A, B, ignoreLength) + distanceBodies(A, B);
+    return { ok: true, dist };
+}
+
+// Si A y B son idénticos, dist = 0.
+
 
 // -------------------------
 // ImpHash
 // -------------------------
-function compareImphash(a,b){
-    const A=a.trim().toLowerCase(),B=b.trim().toLowerCase();
-    const valid=s=>/^[0-9a-f]{32}$/.test(s);
-    if(!valid(A)||!valid(B)) return {ok:false,score:0,reason:'Invalid MD5 (ImpHash)'};
-    const eq=A===B; const ham=hamming(A,B); const levd=lev(A,B);
-    return {ok:true,score:eq?100:Math.max(0,100-Math.min(levd*3,100)),eq,ham,lev:levd};
+function compareImpHash(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') {
+    return { ok: false, reason: 'Inputs must be strings' };
+    }
+    const A = a.trim();
+    const B = b.trim();
+    const valid = s => /^[0-9a-fA-F]{32}$/.test(s);
+    if (!valid(A) || !valid(B)) {
+    return { ok: false, reason: 'Invalid ImpHash (must be 32 hex chars)' };
+    }
+    const eq = A.toLowerCase() === B.toLowerCase();
+    return { ok: true, eq };
 }
+
 
 // -------------------------
 // vhash heuristic similarity
