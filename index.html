@@ -1,368 +1,732 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Hash Comparator — vhash · SSDEEP · TLSH · ImpHash</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <meta name="description" content="Client‑side similarity/comparison tool for vhash, SSDEEP, TLSH, and ImpHash. Runs entirely in your browser.">
-    <style>
-    :root { color-scheme: light dark; }
-    .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
-    .chip { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs border; }
-    .kbd { @apply border rounded px-1 py-0.5 text-xs font-semibold; }
-    #drop-zone { border: 2px dashed #888; border-radius: 1rem; padding: 1rem; text-align: center; cursor: pointer; }
-    #drop-zone.dragover { background: rgba(0,0,0,0.05); }
-    </style>
-</head>
-<body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 min-h-screen">
-    <div class="max-w-6xl mx-auto p-4 sm:p-6">
-    <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-        <div>
-        <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">Hash Comparator
-            <span class="text-sm align-top font-medium text-gray-500">v1.2</span>
-        </h1>
-        <p class="text-sm text-gray-600 dark:text-gray-400">Compare <span class="font-semibold">vhash</span>, <span class="font-semibold">SSDEEP</span>, <span class="font-semibold">TLSH</span>, and <span class="font-semibold">ImpHash</span> in your browser. No uploads.</p>
-        </div>
-        <div class="flex items-center gap-2">
-        <button id="btn-share" class="rounded-2xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Share</button>
-        <a href="https://github.com/new" target="_blank" class="rounded-2xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Add to GitHub</a>
-        </div>
-    </header>
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Hash Comparator — vhash · SSDEEP · TLSH · ImpHash</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <meta name="description" content="Client-side similarity/comparison tool for vhash, SSDEEP, TLSH, and ImpHash. Runs entirely in your browser." />
+        <style>
+            :root {
+                color-scheme: light dark;
+            }
+            .mono {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            }
+            #drop-zone {
+                border: 2px dashed #888;
+                border-radius: 1rem;
+                padding: 1rem;
+                text-align: center;
+                cursor: pointer;
+            }
+            #drop-zone.dragover {
+                background: rgba(0, 0, 0, 0.05);
+            }
+        </style>
+    </head>
+    <body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 min-h-screen">
+        <div class="max-w-6xl mx-auto p-4 sm:p-6">
+            <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+                <div>
+                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">
+                        Hash Comparator
+                        <span class="text-sm align-top font-medium text-gray-500">v1.4</span>
+                    </h1>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        Comparar <span class="font-semibold">vhash</span>, <span class="font-semibold">SSDEEP</span>, <span class="font-semibold">TLSH</span>, y <span class="font-semibold">ImpHash</span> en el navegador. Sin subidas.
+                    </p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-share" class="rounded-2xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Share</button>
+                    <a href="https://github.com/new" target="_blank" class="rounded-2xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Add to GitHub</a>
+                </div>
+            </header>
 
-    <section class="grid md:grid-cols-2 gap-4 md:gap-6">
-        <div class="space-y-3">
-        <div class="flex items-center gap-2">
-            <h2 class="text-lg font-semibold">Input hashes</h2>
-            <span class="text-xs text-gray-500">Paste one per line or drop a file.</span>
-        </div>
-        <textarea id="hashes" class="w-full h-48 md:h-64 mono rounded-2xl border bg-white/70 dark:bg-white/5 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Example:\nSSDEEP: 192:La9X...:...\nTLSH: T1D2E7...\nvhash: 0840:3V8:...\nImpHash: 1f3870be274f6c49b3e31a0c6728957f"></textarea>
-        <div id="drop-zone" class="text-xs text-gray-600 dark:text-gray-400">Drag & drop a text file with hashes here</div>
-        <div class="flex flex-wrap gap-2">
-            <button id="btn-sample" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Load samples</button>
-            <button id="btn-clear" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Clear</button>
-            <button id="btn-compare" class="rounded-xl border px-3 py-1.5 text-sm bg-indigo-600 border-indigo-600 text-white hover:brightness-110">Compare</button>
-        </div>
-        <div class="text-xs text-gray-600 dark:text-gray-400">
-            Tip: Press <span class="kbd">Shift</span>+<span class="kbd">Enter</span> to compare.
-        </div>
-        </div>
-
-        <div class="space-y-3">
-        <h2 class="text-lg font-semibold">Options</h2>
-        <div class="grid grid-cols-1 gap-3">
-            <label class="flex items-center justify-between border rounded-2xl p-3">
-            <div>
-                <div class="font-medium">Auto-detect hash type</div>
-                <div class="text-xs text-gray-500">Based on format (prefix/pattern). You can override per-line with type tags.</div>
+            <!-- Tabs -->
+            <div class="mb-4 flex items-center gap-2 border-b">
+                <button id="tab-hashes" class="px-3 py-2 text-sm font-medium border-b-2 border-indigo-600">Hashes</button>
+                <button id="tab-vt" class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900">VT Paste</button>
             </div>
-            <input id="opt-autodetect" type="checkbox" checked class="h-4 w-4">
-            </label>
-            <label class="flex items-center justify-between border rounded-2xl p-3">
-            <div>
-                <div class="font-medium">Strict SSDEEP</div>
-                <div class="text-xs text-gray-500">Use near-spec similarity (slower). If off, uses fast heuristic.</div>
+
+            <!-- Modo Hashes (original) -->
+            <div id="mode-hashes">
+                <section class="grid md:grid-cols-2 gap-4 md:gap-6">
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-semibold">Input hashes</h2>
+                            <span class="text-xs text-gray-500">Pega uno por línea o suelta un fichero.</span>
+                        </div>
+                        <textarea
+                            id="hashes"
+                            class="w-full h-48 md:h-64 mono rounded-2xl border bg-white/70 dark:bg-white/5 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="Ejemplos:
+SSDEEP: 192:La9X...:...
+TLSH: T1AA3F5C1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890
+vhash: 0840:3V8:...
+ImpHash: 1f3870be274f6c49b3e31a0c6728957f"
+                        ></textarea>
+                        <div id="drop-zone" class="text-xs text-gray-600 dark:text-gray-400">Arrastra aquí un .txt/.log con hashes</div>
+                        <div class="flex flex-wrap gap-2">
+                            <button id="btn-sample" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Load samples</button>
+                            <button id="btn-clear" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Clear</button>
+                            <button id="btn-compare" class="rounded-xl border px-3 py-1.5 text-sm bg-indigo-600 border-indigo-600 text-white hover:brightness-110">Compare</button>
+                        </div>
+                        <div class="text-xs text-gray-600 dark:text-gray-400">
+                            Tip: <kbd class="border rounded px-1 py-0.5 text-xs font-semibold">Shift</kbd>+<kbd class="border rounded px-1 py-0.5 text-xs font-semibold">Enter</kbd> para comparar.
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <h2 class="text-lg font-semibold">Options</h2>
+                        <div class="grid grid-cols-1 gap-3">
+                            <label class="flex items-center justify-between border rounded-2xl p-3">
+                                <div>
+                                    <div class="font-medium">Auto-detect hash type</div>
+                                    <div class="text-xs text-gray-500">Por formato/patrón. Puedes anteponer el tipo (ssdeep:/tlsh:/...)</div>
+                                </div>
+                                <input id="opt-autodetect" type="checkbox" checked class="h-4 w-4" />
+                            </label>
+                            <label class="flex items-center justify-between border rounded-2xl p-3">
+                                <div>
+                                    <div class="font-medium">Strict SSDEEP</div>
+                                    <div class="text-xs text-gray-500">Cálculo más cercano al spec (algo más lento).</div>
+                                </div>
+                                <input id="opt-ssdeep-strict" type="checkbox" checked class="h-4 w-4" />
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="mt-6">
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-lg font-semibold">Results</h2>
+                        <span id="meta" class="text-xs text-gray-500"></span>
+                    </div>
+                    <div id="results" class="mt-3 overflow-x-auto"></div>
+                </section>
             </div>
-            <input id="opt-ssdeep-strict" type="checkbox" checked class="h-4 w-4">
-            </label>
-            <label class="flex items-center justify-between border rounded-2xl p-3">
-            <div>
-                <div class="font-medium">Heuristic vhash similarity</div>
-                <div class="text-xs text-gray-500">Token/Jaccard similarity. <span class="font-medium">Not</span> equivalent to VirusTotal’s score.</div>
+
+            <!-- Modo VT Paste -->
+            <div id="mode-vt" class="hidden">
+                <section class="grid md:grid-cols-2 gap-4 md:gap-6">
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-semibold">Pega tu informe de VirusTotal</h2>
+                            <span class="text-xs text-gray-500">Pega el bloque con MD5, Vhash, SSDEEP, TLSH, Imphash, etc.</span>
+                        </div>
+                        <textarea
+                            id="vt-blob"
+                            class="w-full h-56 mono rounded-2xl border bg-white/70 dark:bg-white/5 p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            placeholder="MD5
+4e6365...
+SHA-1
+0602ea...
+SHA-256
+02f99d...
+Vhash
+0160c66...
+Authentihash
+374c65...
+Imphash
+3e2a6e...
+SSDEEP
+24576:6mfZx...
+TLSH
+T1F7250...
+File type
+Win32 EXE
+Magic
+PE32+ executable (GUI) x86-64 ..."
+                        ></textarea>
+                        <div class="flex flex-wrap gap-2">
+                            <button id="vt-add" class="rounded-xl border px-3 py-1.5 text-sm bg-indigo-600 border-indigo-600 text-white hover:brightness-110">Añadir muestra</button>
+                            <button id="vt-clear" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Vaciar lista</button>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <h2 class="text-lg font-semibold">Muestras añadidas</h2>
+                        <div id="vt-list" class="text-sm text-gray-600 dark:text-gray-400">(No hay muestras)</div>
+                    </div>
+                </section>
+
+                <section class="mt-6 space-y-3">
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-lg font-semibold">Comparar muestras</h2>
+                        <select id="vt-alg" class="border rounded-lg px-2 py-1 text-sm">
+                            <option value="imphash">ImpHash</option>
+                            <option value="vhash">vhash</option>
+                            <option value="ssdeep">SSDEEP</option>
+                            <option value="tlsh">TLSH</option>
+                        </select>
+                        <button id="vt-compare" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Comparar</button>
+                    </div>
+                    <div id="vt-results" class="overflow-x-auto"></div>
+                </section>
             </div>
-            <input id="opt-vhash-heur" type="checkbox" checked class="h-4 w-4">
-            </label>
+
+            <footer class="mt-10 text-xs text-gray-500 leading-relaxed">
+                <p><strong>Notas</strong>: vhash es heurístico (no el comparador propietario de VT). SSDEEP/TLSH se calculan desde las cadenas de hash. ImpHash es MD5 de imports (match exacto, se muestra similitud si no coincide).</p>
+            </footer>
         </div>
-        </div>
-    </section>
 
-    <section class="mt-6">
-        <div class="flex items-center gap-3">
-        <h2 class="text-lg font-semibold">Results</h2>
-        <span id="meta" class="text-xs text-gray-500"></span>
-        </div>
-        <div id="results" class="mt-3 overflow-x-auto"></div>
-    </section>
+        <script>
+            /* ===== Utilidades ===== */
+            const $ = (s) => document.querySelector(s);
+            const el = (t, c) => {
+                const n = document.createElement(t);
+                if (c) n.className = c;
+                return n;
+            };
+            const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+            const lcsLen = (a, b) => {
+                const n = a.length,
+                    m = b.length;
+                if (!n || !m) return 0;
+                const dp = new Array(m + 1).fill(0);
+                let best = 0;
+                for (let i = 1; i <= n; i++) {
+                    let prev = 0;
+                    for (let j = 1; j <= m; j++) {
+                        const tmp = dp[j];
+                        dp[j] = a[i - 1] === b[j - 1] ? prev + 1 : 0;
+                        prev = tmp;
+                        if (dp[j] > best) best = dp[j];
+                    }
+                }
+                return best;
+            };
+            const lev = (a, b) => {
+                const n = a.length,
+                    m = b.length;
+                const d = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+                for (let i = 0; i <= n; i++) d[i][0] = i;
+                for (let j = 0; j <= m; j++) d[0][j] = j;
+                for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+                return d[n][m];
+            };
 
-        <footer class="mt-10 text-xs text-gray-500 leading-relaxed">
-        <p><strong>Notes</strong>: vhash similarity here is a best‑effort tokenizer/Jaccard heuristic for educational use and <em>does not</em> replicate VirusTotal’s proprietary comparator. SSDEEP and TLSH comparisons are computed from hash strings only (no files needed). ImpHash is an exact match (MD5 of imports) with optional string distances for convenience.</p>
-        <p class="mt-1">All processing is client‑side. You can host this file directly on GitHub Pages. Made with ♥ for DFIR & malware triage.</p>
-        </footer>
-    </div>
+            /* ===== Detección & parsing ===== */
+            function detectType(s) {
+                const t = s.trim();
+                const m = t.match(/^(ssdeep|tlsh|vhash|imphash)\s*[:=]\s*(.+)$/i);
+                if (m) return { type: m[1].toLowerCase(), value: m[2].trim() };
+                if (/^[0-9a-f]{32}$/i.test(t)) return { type: "imphash", value: t };
+                if (/^T[0-9]/i.test(t) && /[0-9a-f]{70,}/i.test(t.replace(/[^0-9a-f]/gi, ""))) return { type: "tlsh", value: t };
+                if (/^\d+:[A-Za-z0-9\/+\.]+:[A-Za-z0-9\/+\.]+$/.test(t)) return { type: "ssdeep", value: t };
+                if (/^\d+:[A-Za-z0-9:._-]+$/.test(t)) return { type: "vhash", value: t };
+                return { type: "unknown", value: t };
+            }
 
-<script>
-// -------------------------
-// Utilities
-// -------------------------
-const $ = sel => document.querySelector(sel);
-const el = (tag, cls) => { const n = document.createElement(tag); if (cls) n.className = cls; return n; };
-const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-const lcsLen = (a, b) => { const n=a.length, m=b.length; if(!n||!m) return 0; const dp=new Array(m+1).fill(0); let best=0;
-    for(let i=1;i<=n;i++){ let prev=0; for(let j=1;j<=m;j++){ const tmp=dp[j]; dp[j] = (a[i-1]===b[j-1]) ? prev+1 : 0; prev=tmp; if(dp[j]>best) best=dp[j]; }} return best; };
-const hamming = (a,b) => (a.length===b.length) ? [...a].reduce((s,ch,i)=>s+(ch!==b[i]),0) : NaN;
-const lev = (a,b) => { const n=a.length,m=b.length; const dp=Array.from({length:n+1},()=>new Array(m+1).fill(0)); for(let i=0;i<=n;i++) dp[i][0]=i; for(let j=0;j<=m;j++) dp[0][j]=j; for(let i=1;i<=n;i++) for(let j=1;j<=m;j++) dp[i][j]=Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+(a[i-1]===b[j-1]?0:1)); return dp[n][m]; };
+            /* ===== SSDEEP ===== */
+            function parseSsdeep(h) {
+                const m = h.trim().match(/^(\d+):([^:]+):([^:]+)$/);
+                if (!m) return null;
+                return { b: +m[1], h1: m[2], h2: m[3] };
+            }
+            function _scoreChunks(a, b) {
+                const l = lcsLen(a, b);
+                if (l === 0) return 0;
+                const max = Math.max(a.length, b.length);
+                return Math.round((100 * (2 * l)) / (max + l));
+            }
+            function compareSsdeep(sa, sb, strict = true) {
+                const A = parseSsdeep(sa),
+                    B = parseSsdeep(sb);
+                if (!A || !B) return { ok: false, score: 0, reason: "Invalid SSDEEP" };
+                const pairs = [];
+                if (A.b === B.b) pairs.push([A.h1, B.h1], [A.h2, B.h2]);
+                if (A.b * 2 === B.b) pairs.push([A.h2, B.h1]);
+                if (B.b * 2 === A.b) pairs.push([A.h1, B.h2]);
+                if (!pairs.length) return { ok: true, score: 0, detail: "Block sizes not comparable" };
+                let best = 0,
+                    details = [];
+                for (const [x, y] of pairs) {
+                    let s = _scoreChunks(x, y);
+                    if (strict) {
+                        const norm = (z) => z.replace(/(.)\1{3,}/g, "$1$1$1");
+                        s = _scoreChunks(norm(x), norm(y));
+                    }
+                    best = Math.max(best, s);
+                    details.push({ x, y, s });
+                }
+                return { ok: true, score: best, pairs: details };
+            }
 
-// -------------------------
-// Type detection & parsing
-// -------------------------
-function detectType(s){
-    const t = s.trim();
-    const m = t.match(/^(ssdeep|tlsh|vhash|imphash)\s*[:=]\s*(.+)$/i);
-    if(m) return {type:m[1].toLowerCase(), value:m[2].trim()};
-    if(/^[0-9a-f]{32}$/i.test(t)) return {type:'imphash', value:t};
-  // Canonical TLSH (T1...) with at least ~70 hex after stripping non-hex
-    if(/^T[0-9]/i.test(t) && /[0-9a-f]{70,}/i.test(t.replace(/[^0-9a-f]/gi,''))) return {type:'tlsh', value:t};
-    if(/^[0-9]+:[A-Za-z0-9\/+\.]+:[A-Za-z0-9\/+\.]+$/.test(t)) return {type:'ssdeep', value:t};
-    if(/^[0-9]+:[A-Za-z0-9:._-]+$/.test(t)) return {type:'vhash', value:t};
-    return {type:'unknown', value:t};
-}
+            /* ===== TLSH (distancia aproximada compatible, hash-only) ===== */
+            function parseTlsh(s) {
+                if (typeof s !== "string") return null;
+                const raw = s.trim();
+                const h = (/^T[0-9]/.test(raw) ? raw.replace(/^T[0-9]/, "") : raw).replace(/[^0-9a-f]/gi, "").toLowerCase();
+                if (h.length !== 70 && h.length !== 74) return null; // 1B o 3B checksum
+                const bodyLen = 64;
+                const chkLen = h.length - (2 + 2 + bodyLen);
+                if (chkLen !== 2 && chkLen !== 6) return null;
+                const chk = h.slice(0, chkLen);
+                const l = parseInt(h.slice(chkLen, chkLen + 2), 16);
+                const qByte = parseInt(h.slice(chkLen + 2, chkLen + 4), 16);
+                const q1 = (qByte >> 4) & 0xf,
+                    q2 = qByte & 0xf;
+                const body = h.slice(chkLen + 4);
+                if (body.length !== bodyLen) return null;
+                return { chk, l, q1, q2, body };
+            }
+            function modDiff(x, y, r) {
+                const a = (x - y + r) % r,
+                    b = (y - x + r) % r;
+                return a < b ? a : b;
+            }
+            function distanceHeaders(A, B, ignoreLen = false) {
+                let d = 0;
+                if (!ignoreLen) {
+                    const ld = modDiff(A.l, B.l, 256);
+                    d += ld <= 1 ? ld : ld * 12;
+                }
+                const q1 = modDiff(A.q1, B.q1, 16);
+                d += q1 <= 1 ? q1 : (q1 - 1) * 12;
+                const q2 = modDiff(A.q2, B.q2, 16);
+                d += q2 <= 1 ? q2 : (q2 - 1) * 12;
+                if (A.chk !== B.chk) d += 1;
+                return d;
+            }
+            function distanceBodies(A, B) {
+                let d = 0;
+                for (let i = 0; i < 64; i++) {
+                    const x = parseInt(A.body[i], 16),
+                        y = parseInt(B.body[i], 16);
+                    const x1 = (x / 4) | 0,
+                        x2 = x % 4,
+                        y1 = (y / 4) | 0,
+                        y2 = y % 4;
+                    const d1 = Math.abs(x1 - y1),
+                        d2 = Math.abs(x2 - y2);
+                    d += (d1 === 3 ? 6 : d1) + (d2 === 3 ? 6 : d2);
+                }
+                return d;
+            }
+            function compareTlsh(a, b) {
+                const A = parseTlsh(a),
+                    B = parseTlsh(b);
+                if (!A || !B) return { ok: false, score: 0, reason: "Invalid TLSH" };
+                const dist = distanceHeaders(A, B, false) + distanceBodies(A, B);
+                const score = Math.round(100 / (1 + Math.exp((dist - 20) / 4))); // mapa logístico 0..100
+                return { ok: true, score, dist };
+            }
 
-// -------------------------
-// SSDEEP comparison (hash->hash)
-// -------------------------
-function parseSsdeep(h){ const m = h.trim().match(/^(\d+):([^:]+):([^:]+)$/); if(!m) return null; return { b: parseInt(m[1],10), h1:m[2], h2:m[3] }; }
-function _scoreChunks(a,b){ const l = lcsLen(a,b); if(l===0) return 0; const maxLen=Math.max(a.length,b.length); return Math.round(100*(2*l)/(maxLen+l)); }
-function compareSsdeep(sa,sb,strict=true){
-    const A=parseSsdeep(sa),B=parseSsdeep(sb);
-    if(!A||!B) return {ok:false,score:0,reason:'Invalid SSDEEP format'};
-    const pairs=[];
-    if(A.b===B.b) pairs.push([A.h1,B.h1],[A.h2,B.h2]);
-    if(A.b*2===B.b) pairs.push([A.h2,B.h1]);
-    if(B.b*2===A.b) pairs.push([A.h1,B.h2]);
-    if(pairs.length===0) return {ok:true,score:0,detail:'Block sizes not comparable'};
-    let best=0,details=[];
-    for(const [x,y] of pairs){
-    let s=_scoreChunks(x,y);
-    if(strict){ const norm=z=>z.replace(/(.)\1{3,}/g,'$1$1$1'); s=_scoreChunks(norm(x),norm(y)); }
-    best=Math.max(best,s);
-    details.push({x,y,s});
-    }
-    return {ok:true,score:best,pairs:details};
-}
+            /* ===== ImpHash ===== */
+            function compareImpHash(a, b) {
+                const A = a.trim().toLowerCase(),
+                    B = b.trim().toLowerCase();
+                if (!/^[0-9a-f]{32}$/.test(A) || !/^[0-9a-f]{32}$/.test(B)) return { ok: false, score: 0, reason: "Invalid MD5" };
+                const eq = A === B;
+                const l = lev(A, B);
+                return { ok: true, score: eq ? 100 : Math.max(0, 100 - Math.min(l * 3, 100)), eq, lev: l };
+            }
 
-function parseTlsh(s) {
-    if (typeof s !== 'string') return null;
-    const raw = s.trim();
-  const m = raw.match(/^T[01]/) ? raw.replace(/^T[01]/, '') : raw; // soporta T1 y legado
-    const H = m.replace(/[^0-9a-f]/gi, '').toLowerCase();
-  if (H.length !== 70 && H.length !== 74) return null; // 1B checksum (70) o 3B (74)
-  const bodyLen = 64; // 64 hex digits (no bytes)
-    const chkLen = H.length - (2 /*l*/ + 2 /*q*/ + bodyLen);
-    if (chkLen !== 2 && chkLen !== 6) return null;
+            /* ===== vhash (heurístico) ===== */
+            function vhashTokens(v) {
+                return new Set(
+                    v
+                        .trim()
+                        .split(":")
+                        .flatMap((x) => x.split(/[._-]/))
+                        .filter((x) => x && !/^\d+$/.test(x))
+                );
+            }
+            function compareVhash(a, b) {
+                const A = vhashTokens(a),
+                    B = vhashTokens(b);
+                const inter = [...A].filter((x) => B.has(x)).length,
+                    uni = new Set([...A, ...B]).size,
+                    j = uni ? inter / uni : 0;
+                const l = lcsLen(a, b),
+                    max = Math.max(a.length, b.length),
+                    lbonus = max ? (l / max) * 0.25 : 0;
+                return { ok: true, score: Math.round(clamp((j * 0.85 + lbonus) * 100, 0, 100)), jaccard: +j.toFixed(3), lcs: l };
+            }
 
-    const chk = H.slice(0, chkLen);
-    const l = parseInt(H.slice(chkLen, chkLen + 2), 16);
-    const qByte = parseInt(H.slice(chkLen + 2, chkLen + 4), 16);
-    const q1 = (qByte >> 4) & 0xF;
-    const q2 = qByte & 0xF;
-  const body = H.slice(chkLen + 4); // 64 hex digits
-    if (body.length !== bodyLen) return null;
-    return { chk, l, q1, q2, body };
-}
+            /* ===== Dispatcher (modo Hashes) ===== */
+            function compareAny(a, b) {
+                if (a.type !== b.type) return { score: null, note: "Type mismatch" };
+                switch (a.type) {
+                    case "ssdeep":
+                        return compareSsdeep(a.value, b.value, $("#opt-ssdeep-strict").checked);
+                    case "tlsh":
+                        return compareTlsh(a.value, b.value);
+                    case "imphash":
+                        return compareImpHash(a.value, b.value);
+                    case "vhash":
+                        return compareVhash(a.value, b.value);
+                    default:
+                        return { score: null };
+                }
+            }
+            function prettyType(t) {
+                return { ssdeep: "SSDEEP", tlsh: "TLSH", vhash: "vhash", imphash: "ImpHash" }[t] || "Unknown";
+            }
+            function parseLines() {
+                return $("#hashes")
+                    .value.split(/\r?\n/)
+                    .map((x) => x.trim())
+                    .filter(Boolean)
+                    .map(detectType);
+            }
+            function render() {
+                const items = parseLines();
+                const n = items.length;
+                if (!n) {
+                    $("#results").innerHTML = "";
+                    $("#meta").textContent = "";
+                    return;
+                }
+                const table = el("table", "min-w-full border-separate border-spacing-0");
+                const thead = el("thead", "");
+                const trh = el("tr", "");
+                trh.appendChild(el("th", "sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 p-2 text-left text-xs font-semibold text-gray-500"));
+                items.forEach((it, i) => {
+                    const th = el("th", "px-2 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap");
+                    th.textContent = `${i + 1}. ${prettyType(it.type)}`;
+                    trh.appendChild(th);
+                });
+                thead.appendChild(trh);
+                table.appendChild(thead);
+                const tbody = el("tbody", "");
+                items.forEach((row, i) => {
+                    const tr = el("tr", "");
+                    const head = el("th", "sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 pr-3 pl-2 py-2 text-left align-top");
+                    head.innerHTML = `<div class="text-xs font-semibold">${i + 1}. ${prettyType(row.type)}</div><div class="mono text-xs text-gray-500 break-all">${row.value}</div>`;
+                    tr.appendChild(head);
+                    items.forEach((col, j) => {
+                        const td = el("td", "px-2 py-2 align-top");
+                        if (i === j) {
+                            td.innerHTML = '<div class="text-center text-xs text-gray-400">—</div>';
+                            tr.appendChild(td);
+                            return;
+                        }
+                        const res = compareAny(row, col);
+                        let inner = "";
+                        if (res.score == null) {
+                            inner = `<div class='text-xs text-gray-500'>${res.note || "N/A"}</div>`;
+                        } else {
+                            const score = res.score,
+                                hue = score * 1.2;
+                            inner += `<div class='text-sm font-semibold' style='color:hsl(${hue},70%,45%)'>${score}</div>`;
+                            inner += `<div class='text-[10px] text-gray-500'>/100</div>`;
+                            if (res.pairs) {
+                                inner += `<div class='text-[10px] text-gray-500 mt-1'>pairs: ${res.pairs.map((p) => p.s).join(", ")}</div>`;
+                            }
+                            if (res.jaccard != null) {
+                                inner += `<div class='text-[10px] text-gray-500'>jaccard ${res.jaccard}</div>`;
+                            }
+                            if (res.dist != null) {
+                                inner += `<div class='text-[10px] text-gray-500'>dist ${res.dist}</div>`;
+                            }
+                            if (res.eq === true) {
+                                inner += `<div class='text-[10px] text-emerald-600'>exact match</div>`;
+                            }
+                        }
+                        td.innerHTML = `<div class='flex items-baseline gap-1'>${inner}</div>`;
+                        td.style.background = res.score == null ? "" : `linear-gradient(90deg, hsla(${Math.max(0, 120 - res.score * 1.2)},80%,90%,0.6), transparent)`;
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+                $("#results").innerHTML = "";
+                $("#results").appendChild(table);
+                $("#meta").textContent = `${n} hash${n > 1 ? "es" : ""} • ${new Date().toLocaleString()}`;
+            }
 
-function modDiff(x, y, r) {
-    const a = (x - y + r) % r, b = (y - x + r) % r;
-    return a < b ? a : b;
-}
-
-function distanceHeaders(A, B, ignoreLen=false) {
-    let diff = 0;
-    if (!ignoreLen) {
-    const ldiff = modDiff(A.l, B.l, 256);
-    diff += (ldiff <= 1) ? ldiff : ldiff * 12;
-    }
-    const q1diff = modDiff(A.q1, B.q1, 16);
-  diff += (q1diff <= 1) ? q1diff : (q1diff - 1) * 12;
-
-    const q2diff = modDiff(A.q2, B.q2, 16);
-  diff += (q2diff <= 1) ? q2diff : (q2diff - 1) * 12;
-
-    if (A.chk !== B.chk) diff += 1;
-    return diff;
-}
-
-function distanceBodies(A, B) {
-    let diff = 0;
-    for (let i = 0; i < 64; i++) {
-    const x = parseInt(A.body[i], 16); // hex digit -> 0..15
-    const y = parseInt(B.body[i], 16);
-    const x1 = (x / 4) | 0, x2 = x % 4;
-    const y1 = (y / 4) | 0, y2 = y % 4;
-    const d1 = Math.abs(x1 - y1);
-    const d2 = Math.abs(x2 - y2);
-    diff += (d1 === 3 ? 6 : d1) + (d2 === 3 ? 6 : d2);
-    }
-    return diff;
-}
-
-// API principal (compatible con tlsh.diff / opción diffxlen)
-function compareTlsh(a,b){
-    const A = parseTlsh(a), B = parseTlsh(b);
-    if (!A || !B) return { ok: false, score: 0, reason: 'Invalid TLSH format' };
-    const dist = distanceHeaders(A, B, false) + distanceBodies(A, B);
-  const score = Math.round(100/(1+Math.exp((dist-20)/4))); // 0..100 similarity
-    return { ok: true, score, dist };
-}
-
-
-// Si A y B son idénticos, dist = 0.
-
-
-// -------------------------
-// ImpHash
-// -------------------------
-function compareImphash(a,b){
-    const A=a.trim().toLowerCase(),B=b.trim().toLowerCase();
-    const valid=s=>/^[0-9a-f]{32}$/.test(s);
-    if(!valid(A)||!valid(B)) return {ok:false, score:0, reason:'Invalid MD5 (ImpHash)'};
-    const eq=A===B; const ham=[...A].reduce((s,ch,i)=>s+(ch!==B[i]),0);
-    const lev = (x,y)=>{const n=x.length,m=y.length,d=Array.from({length:n+1},()=>Array(m+1).fill(0));for(let i=0;i<=n;i++)d[i][0]=i;for(let j=0;j<=m;j++)d[0][j]=j;for(let i=1;i<=n;i++)for(let j=1;j<=m;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(x[i-1]===y[j-1]?0:1));return d[n][m];};
-    const levd=lev(A,B);
-    return { ok:true, score: eq?100:Math.max(0,100-Math.min(levd*3,100)), eq, ham, lev:levd };
-}
-
-
-
-// -------------------------
-// vhash heuristic similarity
-// -------------------------
-function vhashTokens(v){ const t=v.trim(); const parts=t.split(':').flatMap(x=>x.split(/[._-]/)); return new Set(parts.filter(x=>x && !/^\d+$/.test(x))); }
-function compareVhash(a,b){
-    const A=vhashTokens(a),B=vhashTokens(b);
-    const inter=[...A].filter(x=>B.has(x)).length; const uni=new Set([...A,...B]).size;
-    const j=uni? inter/uni : 0;
-    const l=lcsLen(a,b); const maxLen=Math.max(a.length,b.length);
-    const lbonus = maxLen? (l/maxLen)*0.25 : 0;
-    const sim = clamp((j*0.85 + lbonus)*100, 0, 100);
-    return { ok:true, score:Math.round(sim), jaccard:+(j.toFixed(3)), lcs:l };
-}
-
-// -------------------------
-// Matrix & UI
-// -------------------------
-function parseLines(){
-    const raw = $('#hashes').value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-    const autodetect = $('#opt-autodetect').checked;
-    return raw.map(line=> autodetect ? detectType(line) : {type:'unknown', value:line});
-}
-function prettyType(t){ return t==='ssdeep'?'SSDEEP': t==='tlsh'?'TLSH': t==='vhash'?'vhash': t==='imphash'?'ImpHash': 'Unknown'; }
-
-// Main comparator function
-function compare(a,b){
-    if(a.type!==b.type) return {score:null, note:'Type mismatch'};
-    switch(a.type){
-    case 'ssdeep':  return compareSsdeep(a.value,b.value, $('#opt-ssdeep-strict').checked);
-    case 'tlsh':    return compareTlsh(a.value,b.value);
-    case 'imphash': return compareImphash(a.value,b.value);
-    case 'vhash':   return compareVhash(a.value,b.value);
-    default:        return {score:null, note:'Unknown type'};
-    }
-}
-// Back-compat alias to fix your error
-const compareAny = compare;
-
-function render(){
-    const items = parseLines();
-    const n = items.length;
-    if(n===0){ $('#results').innerHTML=''; $('#meta').textContent=''; return; }
-    const table = el('table','min-w-full border-separate border-spacing-0');
-    const thead = el('thead',''); const trh = el('tr',''); trh.appendChild(el('th','sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 p-2 text-left text-xs font-semibold text-gray-500'));
-    items.forEach((it,i)=>{ const th=el('th','px-2 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap'); th.textContent = `${i+1}. ${prettyType(it.type)}`; trh.appendChild(th); });
-    thead.appendChild(trh); table.appendChild(thead);
-    const tbody = el('tbody','');
-    items.forEach((row,i)=>{
-    const tr = el('tr','');
-    const head = el('th','sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 pr-3 pl-2 py-2 text-left align-top');
-    head.innerHTML = `<div class="text-xs font-semibold">${i+1}. ${prettyType(row.type)}</div><div class="mono text-xs text-gray-500 break-all">${row.value}</div>`;
-    tr.appendChild(head);
-    items.forEach((col,j)=>{
-        const td = el('td','px-2 py-2 align-top');
-        if(i===j){ td.innerHTML = `<div class="text-center text-xs text-gray-400">—</div>`; tr.appendChild(td); return; }
-        const res = compareAny(row,col);
-        let inner = '';
-        if(res.score==null){ inner = `<div class='text-xs text-gray-500'>${res.note||'N/A'}</div>`; }
-        else{
-        const score = res.score;
-        const hue = 0 + (score*1.2); // 0→120 deg approx
-        inner += `<div class='text-sm font-semibold' style='color:hsl(${hue},70%,45%)'>${score}</div>`;
-        inner += `<div class='text-[10px] text-gray-500'>/100</div>`;
-        if(res.pairs){ inner += `<div class='text-[10px] text-gray-500 mt-1'>pairs: ${res.pairs.map(p=>p.s).join(', ')}</div>`; }
-        if(res.jaccard!=null){ inner += `<div class='text-[10px] text-gray-500'>jaccard ${res.jaccard}</div>`; }
-        if(res.dist!=null){ inner += `<div class='text-[10px] text-gray-500'>dist ${res.dist}</div>`; if(res.parts){ inner += `<div class='text-[10px] text-gray-500'>body ${res.parts.bodyDist}, q ${res.parts.qDist}, l ${res.parts.lDist}, chk ${res.parts.chkDist}</div>`; } }
-        if(res.eq===true){ inner += `<div class='text-[10px] text-emerald-600'>exact match</div>`; }
-        if(res.detail){ inner += `<div class='text-[10px] text-gray-500'>${res.detail}</div>`; }
-        }
-        td.innerHTML = `<div class='flex items-baseline gap-1'>${inner}</div>`;
-        td.style.background = res.score==null ? '' : `linear-gradient(90deg, hsla(${Math.max(0,120-res.score*1.2)},80%,90%,0.6), transparent)`;
-        tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    $('#results').innerHTML=''; $('#results').appendChild(table);
-    $('#meta').textContent = `${n} hash${n>1?'es':''} • ${new Date().toLocaleString()}`;
-}
-
-// -------------------------
-// Samples & UX
-// -------------------------
-const samples = `# You can keep these or replace with your own
-ssdeep: 3072:dfr2cI9R2oQf9qQwq3b1d6B0YdN:dfIoQf9qQwqb1d6B0
-ssdeep: 3072:Zfr2cI9R2oQf9qQwq3b1d6B0YdM:ZfIoQf9qQwqb1d6B0
-vhash: 0840:3V8:abc.def:ghi
-vhash: 0840:3V9:abc.xyz:ghi
+            /* ===== UX (modo Hashes) ===== */
+            const samples = `ssdeep: 192:abc:xyz
+ssdeep: 192:abc:qrs
+vhash: 0840:aaa:bbb
+vhash: 0840:aaa:ccc
 imphash: 1f3870be274f6c49b3e31a0c6728957f
 imphash: 1f3870be274f6c49b3e31a0c6728957e
-TLSH: T1AA3F5C1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890
-TLSH: T1AA3F5C1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567891`;
+TLSH: T1abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890
+TLSH: T1abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567891`;
+            $("#btn-sample").onclick = () => {
+                $("#hashes").value = samples;
+                render();
+            };
+            $("#btn-clear").onclick = () => {
+                $("#hashes").value = "";
+                render();
+            };
+            $("#btn-compare").onclick = render;
+            $("#hashes").addEventListener("keydown", (e) => {
+                if (e.key === "Enter" && e.shiftKey) {
+                    e.preventDefault();
+                    render();
+                }
+            });
 
-$('#btn-sample').addEventListener('click',()=>{ $('#hashes').value = samples; render(); });
-$('#btn-clear').addEventListener('click',()=>{ $('#hashes').value=''; render(); });
-$('#btn-compare').addEventListener('click',render);
-$('#hashes').addEventListener('keydown',e=>{ if(e.key==='Enter' && e.shiftKey){ e.preventDefault(); render(); } });
+            // Drag & Drop (modo Hashes)
+            const txt = $("#hashes");
+            const dz = $("#drop-zone");
+            function setDZ(a) {
+                dz.classList.toggle("dragover", a);
+                txt.classList.toggle("ring-2", a);
+                txt.classList.toggle("ring-indigo-500", a);
+            }
+            function handleFiles(list) {
+                const readers = [];
+                for (const f of list) {
+                    if (f.type.startsWith("text") || /(\.txt|\.log|\.csv|\.lst|\.hash(?:es)?)$/i.test(f.name)) {
+                        const r = new FileReader();
+                        readers.push(
+                            new Promise((res) => {
+                                r.onload = () => res(r.result);
+                            })
+                        );
+                        r.readAsText(f);
+                    }
+                }
+                Promise.all(readers).then((arr) => {
+                    if (arr.length) {
+                        txt.value += (txt.value ? "\n" : "") + arr.join("\n");
+                        render();
+                    }
+                });
+            }
+            ["dragenter", "dragover"].forEach((ev) =>
+                dz.addEventListener(ev, (e) => {
+                    e.preventDefault();
+                    setDZ(true);
+                })
+            );
+            ["dragleave", "dragend", "drop"].forEach((ev) =>
+                dz.addEventListener(ev, (e) => {
+                    if (ev !== "drop") setDZ(false);
+                })
+            );
+            dz.addEventListener("drop", (e) => {
+                e.preventDefault();
+                setDZ(false);
+                const dt = e.dataTransfer;
+                if (dt?.files?.length) handleFiles(dt.files);
+                const plain = dt.getData("text/plain");
+                if (plain) {
+                    txt.value += (txt.value ? "\n" : "") + plain.trim();
+                    render();
+                }
+            });
+            ["dragenter", "dragover"].forEach((ev) =>
+                txt.addEventListener(ev, (e) => {
+                    e.preventDefault();
+                    setDZ(true);
+                })
+            );
+            ["dragleave", "dragend", "drop"].forEach((ev) =>
+                txt.addEventListener(ev, (e) => {
+                    if (ev !== "drop") setDZ(false);
+                })
+            );
+            txt.addEventListener("drop", (e) => {
+                e.preventDefault();
+                setDZ(false);
+                const dt = e.dataTransfer;
+                if (dt?.files?.length) handleFiles(dt.files);
+                const plain = dt.getData("text/plain");
+                if (plain) {
+                    txt.value += (txt.value ? "\n" : "") + plain.trim();
+                    render();
+                }
+            });
 
-// Share state in URL
-function updateURL(){
-    try{
-    const data = btoa(unescape(encodeURIComponent($('#hashes').value)));
-    history.replaceState(null,'',`#data=${data}`);
-    }catch{}
-}
-function loadFromURL(){
-    const m=location.hash.match(/#data=([^&]+)/); if(!m) return;
-    try{ $('#hashes').value = decodeURIComponent(escape(atob(m[1]))); }catch{}
-}
-$('#btn-share').addEventListener('click',()=>{ updateURL(); navigator.clipboard.writeText(location.href).then(()=>{
-    $('#btn-share').textContent='Copied link!'; setTimeout(()=>$('#btn-share').textContent='Share',1500);
-}); });
+            /* ===== Tabs ===== */
+            const tabHashes = $("#tab-hashes"),
+                tabVT = $("#tab-vt");
+            const modeHashes = $("#mode-hashes"),
+                modeVT = $("#mode-vt");
+            function setTab(which) {
+                if (which === "vt") {
+                    modeHashes.classList.add("hidden");
+                    modeVT.classList.remove("hidden");
+                    tabHashes.classList.remove("border-indigo-600");
+                    tabHashes.classList.add("text-gray-600");
+                    tabVT.classList.add("border-b-2", "border-indigo-600");
+                    tabVT.classList.remove("text-gray-600");
+                } else {
+                    modeVT.classList.add("hidden");
+                    modeHashes.classList.remove("hidden");
+                    tabVT.classList.remove("border-indigo-600");
+                    tabVT.classList.add("text-gray-600");
+                    tabHashes.classList.add("border-b-2", "border-indigo-600");
+                    tabHashes.classList.remove("text-gray-600");
+                }
+            }
+            if (tabHashes && tabVT) {
+                tabHashes.onclick = () => setTab("hashes");
+                tabVT.onclick = () => setTab("vt");
+            }
+            setTab("hashes");
 
-window.addEventListener('load',()=>{ loadFromURL(); if(!$('#hashes').value) $('#hashes').value=samples; render(); });
+            /* ===== VT Paste mode ===== */
+            let vtSamples = []; // {md5, sha1, sha256, vhash, imphash, ssdeep, tlsh, meta:{filetype, magic, trid, size}}
+            function parseVTBlob(txt) {
+                const get = (label) => {
+                    const r = new RegExp("^" + label + "\\n?\\s*([^\\n]+)", "im");
+                    const m = txt.match(r);
+                    return m ? m[1].trim() : "";
+                };
+                const md5 = (get("MD5") || "").toLowerCase();
+                if (!/^[0-9a-f]{32}$/.test(md5)) return { ok: false, reason: "MD5 no encontrado" };
+                const sha1 = (get("SHA-1") || "").toLowerCase();
+                const sha256 = (get("SHA-256") || "").toLowerCase();
+                const vhash = get("Vhash") || get("vhash") || "";
+                const imphash = (get("Imphash") || "").toLowerCase();
+                const ssdeep = get("SSDEEP") || get("SSDEEP Hash") || "";
+                const tlsh = get("TLSH") || "";
+                const filetype = get("File type") || "";
+                const magic = get("Magic") || "";
+                const trid = get("TrID") || "";
+                const size = get("File size") || "";
+                return { ok: true, sample: { md5, sha1, sha256, vhash, imphash, ssdeep, tlsh, meta: { filetype, magic, trid, size } } };
+            }
+            function renderVTList() {
+                const box = $("#vt-list");
+                if (!vtSamples.length) {
+                    box.innerHTML = "(No hay muestras)";
+                    return;
+                }
+                const ul = el("div", "space-y-2");
+                vtSamples.forEach((s) => {
+                    const row = el("div", "flex items-start justify-between gap-3 border rounded-xl p-2");
+                    const left = el("div", "");
+                    left.innerHTML = `<div class="text-sm font-semibold mono">${s.md5}</div>
+      <div class="text-xs text-gray-500 flex flex-wrap gap-2 mt-1">
+        ${s.vhash ? '<span class="px-2 py-0.5 rounded-full border">vhash</span>' : ""}
+        ${s.ssdeep ? '<span class="px-2 py-0.5 rounded-full border">ssdeep</span>' : ""}
+        ${s.tlsh ? '<span class="px-2 py-0.5 rounded-full border">tlsh</span>' : ""}
+        ${s.imphash ? '<span class="px-2 py-0.5 rounded-full border">imphash</span>' : ""}
+      </div>`;
+                    const rm = el("button", "text-xs rounded-md border px-2 py-1 hover:bg-gray-100 dark:hover:bg-gray-900");
+                    rm.textContent = "Eliminar";
+                    rm.onclick = () => {
+                        vtSamples = vtSamples.filter((x) => x.md5 !== s.md5);
+                        renderVTList();
+                    };
+                    row.appendChild(left);
+                    row.appendChild(rm);
+                    ul.appendChild(row);
+                });
+                box.innerHTML = "";
+                box.appendChild(ul);
+            }
+            $("#vt-add").onclick = () => {
+                const t = $("#vt-blob").value;
+                if (!t.trim()) return;
+                const p = parseVTBlob(t);
+                if (!p.ok) {
+                    alert(p.reason || "Formato no válido");
+                    return;
+                }
+                vtSamples = [p.sample, ...vtSamples.filter((x) => x.md5 !== p.sample.md5)];
+                $("#vt-blob").value = "";
+                renderVTList();
+            };
+            $("#vt-clear").onclick = () => {
+                vtSamples = [];
+                renderVTList();
+            };
 
-// -------------------------
-// Drag & Drop support (textarea + drop zone)
-// -------------------------
-const txt = $('#hashes');
-const dz  = $('#drop-zone');
-function setDZ(active){ dz.classList.toggle('dragover', active); txt.classList.toggle('ring-2', active); txt.classList.toggle('ring-indigo-500', active); }
-function handleFiles(fileList){
-    const readers=[];
-    for(const f of fileList){
-    if(f.type.startsWith('text') || /(\.txt|\.log|\.csv|\.lst|\.hash(?:es)?)$/i.test(f.name)){
-        const r = new FileReader();
-        readers.push(new Promise(res=>{ r.onload=()=>res(r.result); }));
-        r.readAsText(f);
-    }
-    }
-    Promise.all(readers).then(arr=>{ if(arr.length){ txt.value += (txt.value? '\n':'') + arr.join('\n'); render(); } });
-}
-['dragenter','dragover'].forEach(ev=> dz.addEventListener(ev, e=>{ e.preventDefault(); setDZ(true); }));
-['dragleave','dragend','drop'].forEach(ev=> dz.addEventListener(ev, e=>{ if(ev!=='drop') setDZ(false); }));
-dz.addEventListener('drop', e=>{ e.preventDefault(); setDZ(false); const dt=e.dataTransfer; if(dt?.files?.length) handleFiles(dt.files); const plain=dt.getData('text/plain'); if(plain){ txt.value += (txt.value?'\n':'') + plain.trim(); render(); } });
-// Also allow dropping directly on the textarea
-['dragenter','dragover'].forEach(ev=> txt.addEventListener(ev, e=>{ e.preventDefault(); setDZ(true); }));
-['dragleave','dragend','drop'].forEach(ev=> txt.addEventListener(ev, e=>{ if(ev!=='drop') setDZ(false); }));
-txt.addEventListener('drop', e=>{ e.preventDefault(); setDZ(false); const dt=e.dataTransfer; if(dt?.files?.length) handleFiles(dt.files); const plain=dt.getData('text/plain'); if(plain){ txt.value += (txt.value?'\n':'') + plain.trim(); render(); } });
-</script>
+            function vtCompareAlgorithm(alg, a, b) {
+                switch (alg) {
+                    case "imphash":
+                        return a.imphash && b.imphash ? compareImpHash(a.imphash, b.imphash) : { score: null, note: "Sin ImpHash" };
+                    case "vhash":
+                        return a.vhash && b.vhash ? compareVhash(a.vhash, b.vhash) : { score: null, note: "Sin vhash" };
+                    case "ssdeep":
+                        return a.ssdeep && b.ssdeep ? compareSsdeep(a.ssdeep, b.ssdeep, $("#opt-ssdeep-strict")?.checked ?? true) : { score: null, note: "Sin SSDEEP" };
+                    case "tlsh":
+                        return a.tlsh && b.tlsh ? compareTlsh(a.tlsh, b.tlsh) : { score: null, note: "Sin TLSH" };
+                    default:
+                        return { score: null };
+                }
+            }
+            function renderVTMatrix() {
+                const alg = $("#vt-alg").value,
+                    box = $("#vt-results");
+                const items = vtSamples.filter((s) => (alg === "imphash" ? !!s.imphash : alg === "vhash" ? !!s.vhash : alg === "ssdeep" ? !!s.ssdeep : alg === "tlsh" ? !!s.tlsh : false));
+                if (items.length < 2) {
+                    box.innerHTML = '<div class="text-sm text-gray-500">Añade al menos dos muestras con el campo requerido para comparar.</div>';
+                    return;
+                }
+                const table = el("table", "min-w-full border-separate border-spacing-0");
+                const thead = el("thead", "");
+                const trh = el("tr", "");
+                trh.appendChild(el("th", "sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 p-2 text-left text-xs font-semibold text-gray-500"));
+                items.forEach((it) => {
+                    const th = el("th", "px-2 py-1 text-xs font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap");
+                    th.textContent = it.md5.slice(0, 8);
+                    trh.appendChild(th);
+                });
+                thead.appendChild(trh);
+                table.appendChild(thead);
+                const tbody = el("tbody", "");
+                items.forEach((row) => {
+                    const tr = el("tr", "");
+                    const head = el("th", "sticky left-0 z-10 bg-gray-50 dark:bg-gray-950 pr-3 pl-2 py-2 text-left align-top");
+                    head.innerHTML = `<div class="text-xs font-semibold mono">${row.md5}</div>`;
+                    tr.appendChild(head);
+                    items.forEach((col) => {
+                        const td = el("td", "px-2 py-2 align-top");
+                        if (row.md5 === col.md5) {
+                            td.innerHTML = '<div class="text-center text-xs text-gray-400">—</div>';
+                            tr.appendChild(td);
+                            return;
+                        }
+                        const res = vtCompareAlgorithm(alg, row, col);
+                        let inner = "";
+                        if (res.score == null) {
+                            inner = `<div class='text-xs text-gray-500'>${res.note || "N/A"}</div>`;
+                        } else {
+                            const score = res.score,
+                                hue = score * 1.2;
+                            inner += `<div class='text-sm font-semibold' style='color:hsl(${hue},70%,45%)'>${score}</div>`;
+                            inner += `<div class='text-[10px] text-gray-500'>/100</div>`;
+                            if (res.jaccard != null) inner += `<div class='text-[10px] text-gray-500'>jaccard ${res.jaccard}</div>`;
+                            if (res.dist != null) inner += `<div class='text-[10px] text-gray-500'>dist ${res.dist}</div>`;
+                            if (res.eq === true) inner += `<div class='text-[10px] text-emerald-600'>exact match</div>`;
+                        }
+                        td.innerHTML = `<div class='flex items-baseline gap-1'>${inner}</div>`;
+                        td.style.background = res.score == null ? "" : `linear-gradient(90deg, hsla(${Math.max(0, 120 - res.score * 1.2)},80%,90%,0.6), transparent)`;
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+                box.innerHTML = "";
+                box.appendChild(table);
+            }
+            $("#vt-compare").onclick = renderVTMatrix;
 
-</body>
+            /* ===== Share URL (solo modo Hashes) ===== */
+            function updateURL() {
+                try {
+                    const data = btoa(unescape(encodeURIComponent($("#hashes").value)));
+                    history.replaceState(null, "", `#data=${data}`);
+                } catch {}
+            }
+            function loadFromURL() {
+                const m = location.hash.match(/#data=([^&]+)/);
+                if (!m) return;
+                try {
+                    $("#hashes").value = decodeURIComponent(escape(atob(m[1])));
+                } catch {}
+            }
+            $("#btn-share").onclick = () => {
+                updateURL();
+                navigator.clipboard.writeText(location.href).then(() => {
+                    $("#btn-share").textContent = "Copied link!";
+                    setTimeout(() => ($("#btn-share").textContent = "Share"), 1500);
+                });
+            };
+            window.addEventListener("load", () => {
+                loadFromURL();
+            });
+        </script>
+    </body>
 </html>
