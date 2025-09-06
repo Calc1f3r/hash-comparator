@@ -23,6 +23,9 @@
             #drop-zone.dragover {
                 background: rgba(0, 0, 0, 0.05);
             }
+            .chip { font-size: 10px; border-radius: 9999px; padding: 2px 6px; border: 1px solid rgba(0,0,0,.15); display:inline-block; }
+            .chip-hit { background: rgba(16,185,129,.1); border-color: rgba(16,185,129,.4); }
+            .chip-miss { background: rgba(107,114,128,.08); border-color: rgba(107,114,128,.3); color: #6b7280; }
         </style>
     </head>
     <body class="bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 min-h-screen">
@@ -31,7 +34,7 @@
                 <div>
                     <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">
                         Hash Comparator
-                        <span class="text-sm align-top font-medium text-gray-500">v1.4</span>
+                        <span class="text-sm align-top font-medium text-gray-500">v1.5</span>
                     </h1>
                     <p class="text-sm text-gray-600 dark:text-gray-400">
                         Comparar <span class="font-semibold">vhash</span>, <span class="font-semibold">SSDEEP</span>, <span class="font-semibold">TLSH</span>, y <span class="font-semibold">ImpHash</span> en el navegador. Sin subidas.
@@ -113,7 +116,7 @@ ImpHash: 1f3870be274f6c49b3e31a0c6728957f"
                     <div class="space-y-3">
                         <div class="flex items-center gap-2">
                             <h2 class="text-lg font-semibold">Pega tu informe de VirusTotal</h2>
-                            <span class="text-xs text-gray-500">Pega el bloque con MD5, Vhash, SSDEEP, TLSH, Imphash, etc.</span>
+                            <span class="text-xs text-gray-500">Pega uno o varios bloques. Admite “Etiqueta valor” o “Etiqueta + siguiente línea valor”.</span>
                         </div>
                         <textarea
                             id="vt-blob"
@@ -137,29 +140,37 @@ T1F7250...
 File type
 Win32 EXE
 Magic
-PE32+ executable (GUI) x86-64 ..."
+PE32+ executable (GUI) x86-64 ...
+TrID
+Win64 Executable (generic)
+Detect It Easy
+PE64, console
+Magika
+application/x-dosexec
+File size
+123456 bytes"
                         ></textarea>
                         <div class="flex flex-wrap gap-2">
-                            <button id="vt-add" class="rounded-xl border px-3 py-1.5 text-sm bg-indigo-600 border-indigo-600 text-white hover:brightness-110">Añadir muestra</button>
+                            <button id="vt-add" class="rounded-xl border px-3 py-1.5 text-sm bg-indigo-600 border-indigo-600 text-white hover:brightness-110">Añadir muestra(s)</button>
                             <button id="vt-clear" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Vaciar lista</button>
+                            <button id="vt-export-txt" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Export TXT</button>
+                            <button id="vt-export-csv" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Export CSV</button>
                         </div>
                     </div>
                     <div class="space-y-3">
-                        <h2 class="text-lg font-semibold">Muestras añadidas</h2>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-lg font-semibold">Muestras añadidas</h2>
+                            <span id="vt-count" class="text-xs text-gray-500">(0/10)</span>
+                        </div>
                         <div id="vt-list" class="text-sm text-gray-600 dark:text-gray-400">(No hay muestras)</div>
                     </div>
                 </section>
 
                 <section class="mt-6 space-y-3">
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-3 flex-wrap">
                         <h2 class="text-lg font-semibold">Comparar muestras</h2>
-                        <select id="vt-alg" class="border rounded-lg px-2 py-1 text-sm">
-                            <option value="imphash">ImpHash</option>
-                            <option value="vhash">vhash</option>
-                            <option value="ssdeep">SSDEEP</option>
-                            <option value="tlsh">TLSH</option>
-                        </select>
-                        <button id="vt-compare" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Comparar</button>
+                        <span class="text-xs text-gray-500">Se evalúan todos los algoritmos a la vez (umbral: ImpHash 100, SSDEEP 30, TLSH 80, vhash 60).</span>
+                        <button id="vt-compare" class="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-900">Comparar (todos)</button>
                     </div>
                     <div id="vt-results" class="overflow-x-auto"></div>
                 </section>
@@ -206,7 +217,7 @@ PE32+ executable (GUI) x86-64 ..."
                 return d[n][m];
             };
 
-            /* ===== Detección & parsing ===== */
+            /* ===== Detección & parsing (modo Hashes) ===== */
             function detectType(s) {
                 const t = s.trim();
                 const m = t.match(/^(ssdeep|tlsh|vhash|imphash)\s*[:=]\s*(.+)$/i);
@@ -253,12 +264,12 @@ PE32+ executable (GUI) x86-64 ..."
                 return { ok: true, score: best, pairs: details };
             }
 
-            /* ===== TLSH (distancia aproximada compatible, hash-only) ===== */
+            /* ===== TLSH (hash-only) ===== */
             function parseTlsh(s) {
                 if (typeof s !== "string") return null;
                 const raw = s.trim();
                 const h = (/^T[0-9]/.test(raw) ? raw.replace(/^T[0-9]/, "") : raw).replace(/[^0-9a-f]/gi, "").toLowerCase();
-                if (h.length !== 70 && h.length !== 74) return null; // 1B o 3B checksum
+                if (h.length !== 70 && h.length !== 74) return null;
                 const bodyLen = 64;
                 const chkLen = h.length - (2 + 2 + bodyLen);
                 if (chkLen !== 2 && chkLen !== 6) return null;
@@ -309,7 +320,7 @@ PE32+ executable (GUI) x86-64 ..."
                     B = parseTlsh(b);
                 if (!A || !B) return { ok: false, score: 0, reason: "Invalid TLSH" };
                 const dist = distanceHeaders(A, B, false) + distanceBodies(A, B);
-                const score = Math.round(100 / (1 + Math.exp((dist - 20) / 4))); // mapa logístico 0..100
+                const score = Math.round(100 / (1 + Math.exp((dist - 20) / 4)));
                 return { ok: true, score, dist };
             }
 
@@ -564,28 +575,56 @@ TLSH: T1abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567891`;
             setTab("hashes");
 
             /* ===== VT Paste mode ===== */
-            let vtSamples = []; // {md5, sha1, sha256, vhash, imphash, ssdeep, tlsh, meta:{filetype, magic, trid, size}}
-            function parseVTBlob(txt) {
-                const get = (label) => {
-                    const r = new RegExp("^" + label + "\\n?\\s*([^\\n]+)", "im");
-                    const m = txt.match(r);
-                    return m ? m[1].trim() : "";
-                };
-                const md5 = (get("MD5") || "").toLowerCase();
+            const VT_MAX = 10;
+            let vtSamples = []; // {md5, sha1, sha256, vhash, authentihash, imphash, ssdeep, tlsh, filetype, magic, trid, detectiteasy, magika, size}
+            function getLabel(txt, label) {
+                // Matches "Label: value", "Label value", or "Label\nvalue"
+                const r = new RegExp("^(?:" + label + ")\\s*(?::|=)?\\s*(?:\\n)?\\s*([^\\n]+)", "im");
+                const m = txt.match(r);
+                return (m && m[1]) ? m[1].trim() : "";
+            }
+
+            function parseVTBlob(one) {
+                const md5 = (getLabel(one, "MD5") || "").toLowerCase().replace(/^:/, "").trim();
                 if (!/^[0-9a-f]{32}$/.test(md5)) return { ok: false, reason: "MD5 no encontrado" };
-                const sha1 = (get("SHA-1") || "").toLowerCase();
-                const sha256 = (get("SHA-256") || "").toLowerCase();
-                const vhash = get("Vhash") || get("vhash") || "";
-                const imphash = (get("Imphash") || "").toLowerCase();
-                const ssdeep = get("SSDEEP") || get("SSDEEP Hash") || "";
-                const tlsh = get("TLSH") || "";
-                const filetype = get("File type") || "";
-                const magic = get("Magic") || "";
-                const trid = get("TrID") || "";
-                const size = get("File size") || "";
-                return { ok: true, sample: { md5, sha1, sha256, vhash, imphash, ssdeep, tlsh, meta: { filetype, magic, trid, size } } };
+                const sha1 = (getLabel(one, "SHA-1") || "").toLowerCase().replace(/^:/, "").trim();
+                const sha256 = (getLabel(one, "SHA-256") || "").toLowerCase().replace(/^:/, "").trim();
+                const vhash = getLabel(one, "Vhash|VHash") || "";
+                const authentihash = (getLabel(one, "Authentihash") || "").toLowerCase();
+                const imphash = (getLabel(one, "Imphash|ImpHash") || "").toLowerCase();
+                const ssdeep = getLabel(one, "SSDEEP|SSDEEP Hash|Ssdeep") || "";
+                const tlsh = getLabel(one, "TLSH|Tlsh") || "";
+                const filetype = getLabel(one, "File type|Filetype|Tipo de archivo") || "";
+                const magic = getLabel(one, "Magic") || "";
+                const trid = getLabel(one, "TrID|TRID|Trid") || "";
+                const detectiteasy = getLabel(one, "Detect It Easy|DIE|die") || "";
+                const magika = getLabel(one, "Magika|MAGIKA") || "";
+                const size = getLabel(one, "File size|Size|Tamaño de archivo") || "";
+                return {
+                    ok: true,
+                    sample: { md5, sha1, sha256, vhash, authentihash, imphash, ssdeep, tlsh, filetype, magic, trid, detectiteasy, magika, size }
+                };
+            }
+            function parseMultipleVTBlobs(txt) {
+                // Split by each block that starts with MD5 at line start
+                const parts = txt.split(/(?=^MD5\b)/im).map(s => s.trim()).filter(Boolean);
+                if (!parts.length) {
+                    // Try a single blob anyway
+                    const p = parseVTBlob(txt);
+                    return p.ok ? [p.sample] : [];
+                }
+                const out = [];
+                for (const part of parts) {
+                    const p = parseVTBlob(part);
+                    if (p.ok) out.push(p.sample);
+                }
+                return out;
+            }
+            function updateVTCount() {
+                $("#vt-count").textContent = `(${vtSamples.length}/${VT_MAX})`;
             }
             function renderVTList() {
+                updateVTCount();
                 const box = $("#vt-list");
                 if (!vtSamples.length) {
                     box.innerHTML = "(No hay muestras)";
@@ -618,12 +657,18 @@ TLSH: T1abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567891`;
             $("#vt-add").onclick = () => {
                 const t = $("#vt-blob").value;
                 if (!t.trim()) return;
-                const p = parseVTBlob(t);
-                if (!p.ok) {
-                    alert(p.reason || "Formato no válido");
+                const found = parseMultipleVTBlobs(t);
+                if (!found.length) {
+                    alert("No se han encontrado bloques válidos con MD5.");
                     return;
                 }
-                vtSamples = [p.sample, ...vtSamples.filter((x) => x.md5 !== p.sample.md5)];
+                // merge, dedupe by md5, cap at 10
+                const byMd5 = new Map(vtSamples.map(x => [x.md5, x]));
+                for (const s of found) {
+                    if (byMd5.size >= VT_MAX && !byMd5.has(s.md5)) break;
+                    byMd5.set(s.md5, { ...byMd5.get(s.md5), ...s });
+                }
+                vtSamples = Array.from(byMd5.values()).slice(0, VT_MAX);
                 $("#vt-blob").value = "";
                 renderVTList();
             };
@@ -632,26 +677,37 @@ TLSH: T1abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567891`;
                 renderVTList();
             };
 
-            function vtCompareAlgorithm(alg, a, b) {
+            const THRESH = { imphash: 100, ssdeep: 30, tlsh: 80, vhash: 60 };
+            function vtCompareOneAlg(alg, a, b) {
                 switch (alg) {
-                    case "imphash":
-                        return a.imphash && b.imphash ? compareImpHash(a.imphash, b.imphash) : { score: null, note: "Sin ImpHash" };
-                    case "vhash":
-                        return a.vhash && b.vhash ? compareVhash(a.vhash, b.vhash) : { score: null, note: "Sin vhash" };
-                    case "ssdeep":
-                        return a.ssdeep && b.ssdeep ? compareSsdeep(a.ssdeep, b.ssdeep, $("#opt-ssdeep-strict")?.checked ?? true) : { score: null, note: "Sin SSDEEP" };
-                    case "tlsh":
-                        return a.tlsh && b.tlsh ? compareTlsh(a.tlsh, b.tlsh) : { score: null, note: "Sin TLSH" };
-                    default:
-                        return { score: null };
+                    case "imphash": return a.imphash && b.imphash ? compareImpHash(a.imphash, b.imphash) : { score: null };
+                    case "vhash": return a.vhash && b.vhash ? compareVhash(a.vhash, b.vhash) : { score: null };
+                    case "ssdeep": return a.ssdeep && b.ssdeep ? compareSsdeep(a.ssdeep, b.ssdeep, $("#opt-ssdeep-strict")?.checked ?? true) : { score: null };
+                    case "tlsh": return a.tlsh && b.tlsh ? compareTlsh(a.tlsh, b.tlsh) : { score: null };
                 }
+                return { score: null };
+            }
+            function vtCompareAll(a, b) {
+                const algs = ["imphash", "ssdeep", "tlsh", "vhash"];
+                const results = {};
+                let best = -1;
+                for (const alg of algs) {
+                    const r = vtCompareOneAlg(alg, a, b);
+                    results[alg] = r;
+                    if (r.score != null) best = Math.max(best, r.score);
+                }
+                return { results, best: best < 0 ? null : best };
+            }
+            function chip(name, r, threshold) {
+                if (r.score == null) return "";
+                const hit = r.score >= threshold;
+                return `<span class="chip ${hit ? "chip-hit" : "chip-miss"}">${name} ${r.score}</span>`;
             }
             function renderVTMatrix() {
-                const alg = $("#vt-alg").value,
-                    box = $("#vt-results");
-                const items = vtSamples.filter((s) => (alg === "imphash" ? !!s.imphash : alg === "vhash" ? !!s.vhash : alg === "ssdeep" ? !!s.ssdeep : alg === "tlsh" ? !!s.tlsh : false));
+                const box = $("#vt-results");
+                const items = vtSamples.slice();
                 if (items.length < 2) {
-                    box.innerHTML = '<div class="text-sm text-gray-500">Añade al menos dos muestras con el campo requerido para comparar.</div>';
+                    box.innerHTML = '<div class="text-sm text-gray-500">Añade al menos dos muestras para comparar.</div>';
                     return;
                 }
                 const table = el("table", "min-w-full border-separate border-spacing-0");
@@ -678,21 +734,23 @@ TLSH: T1abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567891`;
                             tr.appendChild(td);
                             return;
                         }
-                        const res = vtCompareAlgorithm(alg, row, col);
+                        const { results, best } = vtCompareAll(row, col);
                         let inner = "";
-                        if (res.score == null) {
-                            inner = `<div class='text-xs text-gray-500'>${res.note || "N/A"}</div>`;
+                        if (best == null) {
+                            inner = `<div class='text-xs text-gray-500'>N/A</div>`;
                         } else {
-                            const score = res.score,
-                                hue = score * 1.2;
-                            inner += `<div class='text-sm font-semibold' style='color:hsl(${hue},70%,45%)'>${score}</div>`;
-                            inner += `<div class='text-[10px] text-gray-500'>/100</div>`;
-                            if (res.jaccard != null) inner += `<div class='text-[10px] text-gray-500'>jaccard ${res.jaccard}</div>`;
-                            if (res.dist != null) inner += `<div class='text-[10px] text-gray-500'>dist ${res.dist}</div>`;
-                            if (res.eq === true) inner += `<div class='text-[10px] text-emerald-600'>exact match</div>`;
+                            const hue = best * 1.2;
+                            inner += `<div class='text-base font-semibold' style='color:hsl(${hue},70%,45%)'>${best}</div>`;
+                            inner += `<div class='text-[10px] text-gray-500'>mejor /100</div>`;
+                            inner += `<div class="mt-1 flex flex-wrap gap-1">
+                                ${chip("ImpHash", results.imphash, THRESH.imphash)}
+                                ${chip("SSDEEP", results.ssdeep, THRESH.ssdeep)}
+                                ${chip("TLSH", results.tlsh, THRESH.tlsh)}
+                                ${chip("vhash", results.vhash, THRESH.vhash)}
+                            </div>`;
                         }
-                        td.innerHTML = `<div class='flex items-baseline gap-1'>${inner}</div>`;
-                        td.style.background = res.score == null ? "" : `linear-gradient(90deg, hsla(${Math.max(0, 120 - res.score * 1.2)},80%,90%,0.6), transparent)`;
+                        td.innerHTML = `<div class='flex flex-col items-start gap-1'>${inner}</div>`;
+                        td.style.background = best == null ? "" : `linear-gradient(90deg, hsla(${Math.max(0, 120 - best * 1.2)},80%,90%,0.6), transparent)`;
                         tr.appendChild(td);
                     });
                     tbody.appendChild(tr);
@@ -702,6 +760,68 @@ TLSH: T1abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567891`;
                 box.appendChild(table);
             }
             $("#vt-compare").onclick = renderVTMatrix;
+
+            /* ===== Export TXT & CSV ===== */
+            function download(name, text, mime = "text/plain") {
+                const blob = new Blob([text], { type: mime + ";charset=utf-8" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 0);
+            }
+            $("#vt-export-txt").onclick = () => {
+                if (!vtSamples.length) return;
+                const blocks = vtSamples.map(s => 
+`MD5
+${s.md5}
+SHA-1
+${s.sha1 || ""}
+SHA-256
+${s.sha256 || ""}
+Vhash
+${s.vhash || ""}
+Authentihash
+${s.authentihash || ""}
+Imphash
+${s.imphash || ""}
+SSDEEP
+${s.ssdeep || ""}
+TLSH
+${s.tlsh || ""}
+File type
+${s.filetype || ""}
+Magic
+${s.magic || ""}
+TrID
+${s.trid || ""}
+Detect It Easy
+${s.detectiteasy || ""}
+Magika
+${s.magika || ""}
+File size
+${s.size || ""}`.trim());
+                const txt = blocks.join("\n\n------------------------------\n\n");
+                download("vt_blocks.txt", txt, "text/plain");
+            };
+            $("#vt-export-csv").onclick = () => {
+                if (!vtSamples.length) return;
+                const cols = ["md5","sha1","sha256","vhash","authentihash","imphash","ssdeep","tlsh","filetype","magic","trid","detectiteasy","magika","size"];
+                const esc = (v) => {
+                    const s = (v ?? "").toString();
+                    if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+                    return s;
+                };
+                const header = cols.join(",");
+                const rows = vtSamples.map(s => cols.map(k => esc(s[k])).join(","));
+                const csv = [header, ...rows].join("\n");
+                download("vt_samples.csv", csv, "text/csv");
+            };
 
             /* ===== Share URL (solo modo Hashes) ===== */
             function updateURL() {
